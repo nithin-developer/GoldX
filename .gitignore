@@ -1,0 +1,7 @@
+users_app
+__pycache__
+*.pyc
+*.pyo
+.env
+.venv
+stitch_exports
