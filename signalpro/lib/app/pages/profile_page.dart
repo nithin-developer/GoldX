@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:signalpro/app/models/user_profile.dart';
+import 'package:signalpro/app/services/api_exception.dart';
+import 'package:signalpro/app/services/app_data_api.dart';
+import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
+import 'package:signalpro/app/widgets/empty_state_illustration.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
+import 'package:signalpro/app/widgets/primary_button.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({
     required this.onSupport,
     required this.onLogout,
@@ -16,78 +22,161 @@ class ProfilePage extends StatelessWidget {
   final UserProfile? user;
 
   @override
-  Widget build(BuildContext context) {
-    final displayName = user?.fullName?.trim().isNotEmpty == true
-        ? user!.fullName!.trim()
-        : 'SignalPro User';
-    final displayEmail = user?.email ?? 'No email';
-    final displayId = user?.id.toString() ?? '--';
+  State<ProfilePage> createState() => _ProfilePageState();
+}
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        GlassCard(
-          child: Column(
+class _ProfilePageState extends State<ProfilePage> {
+  AppDataApi? _api;
+  Future<UserProfile>? _future;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _api ??= AppDataApi(dio: AuthScope.of(context).apiClient.dio);
+    _future ??= _api!.getProfile();
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _future = _api!.getProfile(forceRefresh: true);
+    });
+    final pending = _future;
+    if (pending != null) {
+      await pending;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<UserProfile>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && widget.user == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError && widget.user == null) {
+          final message = snapshot.error is ApiException
+              ? (snapshot.error as ApiException).message
+              : 'Unable to load profile.';
+          return _ErrorState(message: message, onRetry: _refresh);
+        }
+
+        final user = snapshot.data ?? widget.user;
+        if (user == null) {
+          return const EmptyStateIllustration(
+            title: 'No Profile Data Found',
+            subtitle: 'Please refresh or login again to load your profile.',
+            icon: Icons.person_off_outlined,
+          );
+        }
+
+        final displayName = user.fullName?.trim().isNotEmpty == true
+            ? user.fullName!.trim()
+            : 'SignalPro User';
+        final displayEmail = user.email;
+        final displayId = user.id.toString();
+        final joinedAt = DateFormat('dd MMM yyyy').format(user.createdAt.toLocal());
+
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              const CircleAvatar(
-                radius: 34,
-                backgroundColor: AppColors.backgroundSecondary,
-                child: Icon(Icons.person_outline_rounded, size: 34),
+              GlassCard(
+                child: Column(
+                  children: [
+                    const CircleAvatar(
+                      radius: 34,
+                      backgroundColor: AppColors.backgroundSecondary,
+                      child: Icon(Icons.person_outline_rounded, size: 34),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      displayName,
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      '$displayEmail - ID: $displayId',
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.center,
+                      children: [
+                        _InfoChip(label: 'VIP ${user.vipLevel}'),
+                        _InfoChip(label: user.isActive ? 'Active' : 'Inactive'),
+                        _InfoChip(label: 'Joined $joinedAt'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const _SectionTag('ACCOUNT'),
+              const SizedBox(height: 8),
+              _TileCard(
+                title: 'Invite Code',
+                subtitle: user.inviteCode?.isNotEmpty == true ? user.inviteCode! : 'Not generated yet',
+                icon: Icons.confirmation_number_outlined,
               ),
               const SizedBox(height: 10),
-              Text(
-                displayName,
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+              _TileCard(
+                title: 'Wallet Balance',
+                subtitle: '\$${user.walletBalance.toStringAsFixed(2)}',
+                icon: Icons.account_balance_wallet_outlined,
               ),
-              Text(
-                '$displayEmail - ID: $displayId',
-                style: const TextStyle(color: AppColors.textSecondary),
+              const SizedBox(height: 10),
+              _TileCard(
+                title: 'Withdrawal Password',
+                subtitle: user.hasWithdrawalPassword ? 'Configured' : 'Not configured',
+                icon: Icons.password_rounded,
+              ),
+              const SizedBox(height: 10),
+              const _SectionTag('SUPPORT'),
+              const SizedBox(height: 8),
+              _TileCard(
+                title: 'Customer Support',
+                subtitle: 'Talk to a live agent',
+                icon: Icons.forum_outlined,
+                onTap: widget.onSupport,
+              ),
+              const SizedBox(height: 10),
+              _TileCard(
+                title: 'Logout',
+                subtitle: 'End active sessions',
+                icon: Icons.logout_rounded,
+                danger: true,
+                onTap: widget.onLogout,
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 12),
-        const _SectionTag('ACCOUNT'),
-        const SizedBox(height: 8),
-        const _TileCard(
-          title: 'Account Settings',
-          subtitle: 'Profile details and KYC status',
-          icon: Icons.account_box_outlined,
-        ),
-        const SizedBox(height: 10),
-        const _TileCard(
-          title: 'Withdrawal Password',
-          subtitle: 'Secure your withdrawals',
-          icon: Icons.password_rounded,
-        ),
-        const SizedBox(height: 10),
-        const _SectionTag('SECURITY'),
-        const SizedBox(height: 8),
-        const _TileCard(
-          title: 'Security Settings',
-          subtitle: '2FA and session controls',
-          icon: Icons.security_outlined,
-        ),
-        const SizedBox(height: 10),
-        const _SectionTag('PREFERENCES'),
-        const SizedBox(height: 8),
-        const _SwitchCard(),
-        const SizedBox(height: 10),
-        _TileCard(
-          title: 'Customer Support',
-          subtitle: 'Talk to a live agent',
-          icon: Icons.forum_outlined,
-          onTap: onSupport,
-        ),
-        const SizedBox(height: 10),
-        _TileCard(
-          title: 'Logout',
-          subtitle: 'End active sessions',
-          icon: Icons.logout_rounded,
-          danger: true,
-          onTap: onLogout,
-        ),
-      ],
+        );
+      },
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  const _InfoChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+      ),
     );
   }
 }
@@ -164,36 +253,31 @@ class _TileCard extends StatelessWidget {
   }
 }
 
-class _SwitchCard extends StatefulWidget {
-  const _SwitchCard();
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
 
-  @override
-  State<_SwitchCard> createState() => _SwitchCardState();
-}
-
-class _SwitchCardState extends State<_SwitchCard> {
-  bool notifications = true;
-  bool darkMode = true;
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      child: Column(
-        children: [
-          SwitchListTile.adaptive(
-            value: notifications,
-            onChanged: (value) => setState(() => notifications = value),
-            title: const Text('Notifications'),
-            subtitle: const Text('Price alerts and signal triggers'),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: GlassCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 34),
+              const SizedBox(height: 8),
+              const Text('Unable to load profile', style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+              const SizedBox(height: 12),
+              PrimaryButton(text: 'Retry', onPressed: onRetry),
+            ],
           ),
-          const Divider(height: 8),
-          SwitchListTile.adaptive(
-            value: darkMode,
-            onChanged: (value) => setState(() => darkMode = value),
-            title: const Text('Dark Mode'),
-            subtitle: const Text('Optimized for low luminance'),
-          ),
-        ],
+        ),
       ),
     );
   }

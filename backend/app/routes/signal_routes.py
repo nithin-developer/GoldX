@@ -25,6 +25,24 @@ async def get_signals(
     return [SignalResponse.model_validate(s) for s in signals]
 
 
+@router.get("/all", response_model=list[SignalResponse])
+async def get_all_signals(
+    status: str | None = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all signals from DB for authenticated users (optionally filtered by status)."""
+    signals = await signal_service.get_all_signals(db, skip, limit)
+
+    if status is not None:
+        normalized = status.strip().lower()
+        signals = [s for s in signals if (s.status or "").lower() == normalized]
+
+    return [SignalResponse.model_validate(s) for s in signals]
+
+
 @router.post("/activate", response_model=UserSignalEntryResponse, status_code=201)
 async def activate_signal(
     data: ActivateSignalRequest,
