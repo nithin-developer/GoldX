@@ -9,7 +9,7 @@ class SignalFeedItem {
     required this.createdAt,
   });
 
-  final int id;
+  final String id;
   final String asset;
   final String direction;
   final double profitPercent;
@@ -26,7 +26,7 @@ class SignalFeedItem {
     final duration = json['duration_hours'];
 
     return SignalFeedItem(
-      id: (json['id'] as num?)?.toInt() ?? 0,
+      id: (json['id'] as String? ?? '').trim(),
       asset: (json['asset'] as String? ?? '--').toUpperCase(),
       direction: (json['direction'] as String? ?? '--'),
       profitPercent: double.tryParse(profit.toString()) ?? 0,

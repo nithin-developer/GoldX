@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:signalpro/app/pages/deposit_page.dart';
-import 'package:signalpro/app/pages/follow_signal_page.dart';
 import 'package:signalpro/app/pages/home_page.dart';
 import 'package:signalpro/app/pages/market_page.dart';
+import 'package:signalpro/app/pages/notifications_page.dart';
 import 'package:signalpro/app/pages/profile_page.dart';
 import 'package:signalpro/app/pages/referrals_page.dart';
 import 'package:signalpro/app/pages/signals_page.dart';
@@ -32,9 +32,9 @@ class _AppShellState extends State<AppShell> {
 
   void _openSupport() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SupportChatPage()));
 
-  void _openFollowSignal() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const FollowSignalPage()),
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
     );
   }
 
@@ -98,13 +98,21 @@ class _AppShellState extends State<AppShell> {
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 860),
-                          child: _BodyLayout(tab: _currentTab, child: page),
+                          child: _BodyLayout(
+                            tab: _currentTab,
+                            onNotificationsTap: _openNotifications,
+                            child: page,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 )
-              : _BodyLayout(tab: _currentTab, child: page),
+              : _BodyLayout(
+                  tab: _currentTab,
+                  onNotificationsTap: _openNotifications,
+                  child: page,
+                ),
         ),
       ),
       bottomNavigationBar: wide
@@ -144,7 +152,7 @@ class _AppShellState extends State<AppShell> {
           onSupport: _openSupport,
         );
       case AppTab.signals:
-        return SignalsPage(onFollowSignal: _openFollowSignal);
+        return const SignalsPage();
       case AppTab.market:
         return const MarketPage();
       case AppTab.referrals:
@@ -161,10 +169,15 @@ class _AppShellState extends State<AppShell> {
 }
 
 class _BodyLayout extends StatelessWidget {
-  const _BodyLayout({required this.child, required this.tab});
+  const _BodyLayout({
+    required this.child,
+    required this.tab,
+    required this.onNotificationsTap,
+  });
 
   final Widget child;
   final AppTab tab;
+  final Future<void> Function() onNotificationsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -175,6 +188,7 @@ class _BodyLayout extends StatelessWidget {
           child: AppHeader(
             title: 'SignalPro',
             subtitle: _tabSubtitle(tab),
+            onNotificationsTap: onNotificationsTap,
           ),
         ),
         const SizedBox(height: 4),

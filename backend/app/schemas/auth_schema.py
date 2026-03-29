@@ -21,7 +21,11 @@ class ChangePasswordRequest(BaseModel):
 
 
 class SetWithdrawalPasswordRequest(BaseModel):
-    withdrawal_password: str = Field(..., min_length=6, max_length=64)
+    new_withdrawal_password: Optional[str] = Field(None, min_length=6, max_length=64)
+    withdrawal_password: Optional[str] = Field(None, min_length=6, max_length=64)
+    current_withdrawal_password: Optional[str] = Field(
+        None, min_length=1, max_length=64
+    )
 
 
 class RefreshTokenRequest(BaseModel):

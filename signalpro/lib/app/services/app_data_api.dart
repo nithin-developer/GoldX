@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:signalpro/app/models/app_notification.dart';
 import 'package:signalpro/app/models/referral_models.dart';
 import 'package:signalpro/app/models/signal_feed_item.dart';
+import 'package:signalpro/app/models/signal_history_item.dart';
 import 'package:signalpro/app/models/user_profile.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 
@@ -9,8 +11,10 @@ class AppDataApi {
 
   final Dio _dio;
   static final Map<String, List<SignalFeedItem>> _signalCache = {};
+  static List<SignalHistoryItem>? _signalHistoryCache;
   static ReferralStats? _referralStatsCache;
   static final Map<String, List<ReferralItem>> _referralsCache = {};
+  static List<AppNotification>? _notificationsCache;
   static UserProfile? _profileCache;
   static int? _unreadNotificationsCache;
 
@@ -29,6 +33,15 @@ class AppDataApi {
       return null;
     }
     return List<SignalFeedItem>.from(cached);
+  }
+
+  List<SignalHistoryItem>? getCachedSignalHistory() {
+    final cached = _signalHistoryCache;
+    if (cached == null) {
+      return null;
+    }
+
+    return List<SignalHistoryItem>.from(cached);
   }
 
   String _referralsCacheKey({required int skip, required int limit}) {
@@ -52,8 +65,107 @@ class AppDataApi {
     return _profileCache;
   }
 
+  List<AppNotification>? getCachedNotifications() {
+    final cached = _notificationsCache;
+    if (cached == null) {
+      return null;
+    }
+
+    return List<AppNotification>.from(cached);
+  }
+
   int? getCachedUnreadNotificationsCount() {
     return _unreadNotificationsCache;
+  }
+
+  Future<List<AppNotification>> getNotifications({
+    bool forceRefresh = false,
+    int pageSize = 100,
+    int maxItems = 1000,
+  }) async {
+    if (!forceRefresh && _notificationsCache != null) {
+      return List<AppNotification>.from(_notificationsCache!);
+    }
+
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      var skip = 0;
+      final mapped = <AppNotification>[];
+
+      while (true) {
+        final response = await _dio.get<List<dynamic>>(
+          '/notifications',
+          queryParameters: {
+            'skip': skip,
+            'limit': pageSize,
+            if (forceRefresh) '_ts': timestamp,
+          },
+        );
+
+        final chunk = (response.data ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(AppNotification.fromJson)
+            .toList();
+
+        mapped.addAll(chunk);
+        if (chunk.length < pageSize || mapped.length >= maxItems) {
+          break;
+        }
+
+        skip += pageSize;
+      }
+
+      _notificationsCache = mapped;
+      _unreadNotificationsCache = mapped.where((item) => item.isUnread).length;
+      return List<AppNotification>.from(mapped);
+    } on DioException catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
+  Future<void> markNotificationsRead({
+    bool markAll = false,
+    List<int> notificationIds = const [],
+  }) async {
+    if (!markAll && notificationIds.isEmpty) {
+      return;
+    }
+
+    final payload = <String, dynamic>{
+      'mark_all': markAll,
+      if (notificationIds.isNotEmpty) 'notification_ids': notificationIds,
+    };
+
+    try {
+      await _dio.put<void>('/notifications/read', data: payload);
+
+      if (_notificationsCache != null) {
+        if (markAll) {
+          _notificationsCache = _notificationsCache!
+              .map((item) => item.copyWith(isRead: true))
+              .toList();
+        } else {
+          final ids = notificationIds.toSet();
+          _notificationsCache = _notificationsCache!
+              .map(
+                (item) =>
+                    ids.contains(item.id) ? item.copyWith(isRead: true) : item,
+              )
+              .toList();
+        }
+
+        _unreadNotificationsCache = _notificationsCache!
+            .where((item) => item.isUnread)
+            .length;
+      } else if (markAll) {
+        _unreadNotificationsCache = 0;
+      } else if (_unreadNotificationsCache != null) {
+        final remaining = _unreadNotificationsCache! - notificationIds.length;
+        _unreadNotificationsCache = remaining < 0 ? 0 : remaining;
+      }
+    } on DioException catch (error) {
+      throw mapDioError(error);
+    }
   }
 
   Future<List<SignalFeedItem>> getSignals({
@@ -68,29 +180,19 @@ class AppDataApi {
       }
     }
 
-    Future<List<dynamic>> fetch(String path) async {
+    try {
+      final normalizedStatus = status?.trim();
+      final hasStatusFilter =
+          normalizedStatus != null && normalizedStatus.isNotEmpty;
       final response = await _dio.get<List<dynamic>>(
-        path,
+        hasStatusFilter ? '/signals/all' : '/signals',
         queryParameters: {
-          if (status != null && status.trim().isNotEmpty) 'status': status.trim(),
+          if (hasStatusFilter) 'status': normalizedStatus,
           'limit': 100,
           if (forceRefresh) '_ts': DateTime.now().millisecondsSinceEpoch,
         },
       );
-      return response.data ?? const [];
-    }
-
-    try {
-      List<dynamic> data;
-      try {
-        data = await fetch('/signals/all');
-      } on DioException catch (error) {
-        if (error.response?.statusCode == 404) {
-          data = await fetch('/signals');
-        } else {
-          rethrow;
-        }
-      }
+      final data = response.data ?? const [];
 
       final mapped = data
           .whereType<Map<String, dynamic>>()
@@ -99,6 +201,57 @@ class AppDataApi {
 
       _signalCache[key] = mapped;
       return List<SignalFeedItem>.from(mapped);
+    } on DioException catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
+  Future<List<SignalHistoryItem>> getSignalHistory({
+    bool forceRefresh = false,
+    int skip = 0,
+    int limit = 100,
+  }) async {
+    if (!forceRefresh && _signalHistoryCache != null) {
+      return List<SignalHistoryItem>.from(_signalHistoryCache!);
+    }
+
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/signals/history',
+        queryParameters: {
+          'skip': skip,
+          'limit': limit,
+          if (forceRefresh) '_ts': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+
+      final data = response.data ?? const [];
+      final mapped = data
+          .whereType<Map<String, dynamic>>()
+          .map(SignalHistoryItem.fromJson)
+          .toList();
+
+      _signalHistoryCache = mapped;
+      return List<SignalHistoryItem>.from(mapped);
+    } on DioException catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
+  Future<void> activateSignal({required String signalCode}) async {
+    final normalizedCode = signalCode.trim().toUpperCase();
+    if (normalizedCode.isEmpty) {
+      throw ApiException('Please enter activation code');
+    }
+
+    try {
+      await _dio.post<void>(
+        '/signals/activate',
+        data: {'signal_code': normalizedCode},
+      );
+
+      _signalCache.clear();
+      _signalHistoryCache = null;
     } on DioException catch (error) {
       throw mapDioError(error);
     }
@@ -181,8 +334,17 @@ class AppDataApi {
   }
 
   Future<int> getUnreadNotificationsCount({bool forceRefresh = false}) async {
-    if (!forceRefresh && _unreadNotificationsCache != null) {
-      return _unreadNotificationsCache!;
+    if (!forceRefresh) {
+      if (_unreadNotificationsCache != null) {
+        return _unreadNotificationsCache!;
+      }
+
+      if (_notificationsCache != null) {
+        _unreadNotificationsCache = _notificationsCache!
+            .where((item) => item.isUnread)
+            .length;
+        return _unreadNotificationsCache!;
+      }
     }
 
     try {

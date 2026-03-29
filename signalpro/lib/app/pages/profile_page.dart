@@ -8,6 +8,7 @@ import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/empty_state_illustration.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/primary_button.dart';
+import 'package:signalpro/app/pages/withdrawal_password_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -43,6 +44,24 @@ class _ProfilePageState extends State<ProfilePage> {
     final pending = _future;
     if (pending != null) {
       await pending;
+    }
+  }
+
+  Future<void> _openWithdrawalPasswordPage(UserProfile user) async {
+    final didUpdate = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => WithdrawalPasswordPage(
+          hasExistingPassword: user.hasWithdrawalPassword,
+        ),
+      ),
+    );
+
+    if (didUpdate == true && mounted) {
+      try {
+        await _refresh();
+      } catch (_) {
+        // FutureBuilder will render the error state if refresh fails.
+      }
     }
   }
 
@@ -133,6 +152,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 title: 'Withdrawal Password',
                 subtitle: user.hasWithdrawalPassword ? 'Configured' : 'Not configured',
                 icon: Icons.password_rounded,
+                onTap: () => _openWithdrawalPasswordPage(user),
               ),
               const SizedBox(height: 10),
               const _SectionTag('SUPPORT'),

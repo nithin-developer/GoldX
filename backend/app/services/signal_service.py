@@ -3,10 +3,35 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from app.models.signal import Signal, SignalCode, UserSignalEntry
 from app.models.user import User
 from app.models.wallet import WalletTransaction
+
+
+MIN_SIGNAL_ACTIVATION_BALANCE = Decimal("100")
+
+
+def _normalize_signal_public_id(signal_id: str) -> str:
+    try:
+        return str(uuid.UUID(str(signal_id)))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid signal id",
+        ) from exc
+
+
+async def _get_signal_by_public_id(signal_id: str, db: AsyncSession) -> Signal:
+    normalized_id = _normalize_signal_public_id(signal_id)
+    result = await db.execute(select(Signal).where(Signal.public_id == normalized_id))
+    signal = result.scalar_one_or_none()
+
+    if not signal:
+        raise HTTPException(status_code=404, detail="Signal not found")
+
+    return signal
 
 
 async def get_active_signals(db: AsyncSession) -> list[Signal]:
@@ -46,66 +71,75 @@ async def create_signal(
     return signal
 
 
-async def update_signal(signal_id: int, data: dict, db: AsyncSession) -> Signal:
+async def update_signal(signal_id: str, data: dict, db: AsyncSession) -> Signal:
     """Admin updates a signal."""
-    result = await db.execute(select(Signal).where(Signal.id == signal_id))
-    signal = result.scalar_one_or_none()
-
-    if not signal:
-        raise HTTPException(status_code=404, detail="Signal not found")
+    signal = await _get_signal_by_public_id(signal_id, db)
 
     for key, value in data.items():
         if value is not None:
+            if key == "asset":
+                value = str(value).upper()
+            elif key == "direction":
+                value = str(value).lower()
             setattr(signal, key, value)
 
     await db.flush()
     return signal
 
 
-async def delete_signal(signal_id: int, db: AsyncSession) -> None:
+async def delete_signal(signal_id: str, db: AsyncSession) -> None:
     """Admin deletes a signal."""
-    result = await db.execute(select(Signal).where(Signal.id == signal_id))
-    signal = result.scalar_one_or_none()
-
-    if not signal:
-        raise HTTPException(status_code=404, detail="Signal not found")
+    signal = await _get_signal_by_public_id(signal_id, db)
 
     await db.delete(signal)
     await db.flush()
 
 
 async def generate_signal_codes(
-    signal_id: int, expires_in_hours: int, count: int, db: AsyncSession
-) -> list[SignalCode]:
-    """Admin generates unique activation codes for a signal."""
-    result = await db.execute(select(Signal).where(Signal.id == signal_id))
-    signal = result.scalar_one_or_none()
+    signal_id: str, expires_in_hours: int, count: int, db: AsyncSession
+) -> SignalCode:
+    """Admin generates one activation code per signal and reuses it afterward."""
+    signal = await _get_signal_by_public_id(signal_id, db)
 
-    if not signal:
-        raise HTTPException(status_code=404, detail="Signal not found")
+    existing_result = await db.execute(
+        select(SignalCode)
+        .where(SignalCode.signal_id == signal.id)
+        .order_by(SignalCode.created_at.asc())
+        .limit(1)
+    )
+    existing_code = existing_result.scalar_one_or_none()
 
-    codes = []
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
+    if existing_code is not None:
+        setattr(existing_code, "signal_public_id", signal.public_id)
+        return existing_code
 
-    for _ in range(count):
-        code_str = f"{signal.asset}{uuid.uuid4().hex[:6].upper()}"
-        code = SignalCode(
-            signal_id=signal.id,
-            code=code_str,
-            expires_at=expires_at,
+    if count != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only one activation code can be generated per signal",
         )
-        db.add(code)
-        codes.append(code)
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
+    code_str = f"{signal.asset}{uuid.uuid4().hex[:6].upper()}"
+    code = SignalCode(
+        signal_id=signal.id,
+        code=code_str,
+        expires_at=expires_at,
+    )
+    db.add(code)
 
     await db.flush()
-    return codes
+    setattr(code, "signal_public_id", signal.public_id)
+    return code
 
 
 async def activate_signal(user: User, signal_code: str, db: AsyncSession) -> UserSignalEntry:
     """User activates a signal using a code."""
+    normalized_code = signal_code.strip().upper()
+
     # 1. Validate code exists
     result = await db.execute(
-        select(SignalCode).where(SignalCode.code == signal_code)
+        select(SignalCode).where(SignalCode.code == normalized_code)
     )
     code = result.scalar_one_or_none()
 
@@ -142,15 +176,16 @@ async def activate_signal(user: User, signal_code: str, db: AsyncSession) -> Use
         )
 
     # 5. Check user has balance
-    if user.wallet_balance <= 0:
+    wallet_balance = Decimal(str(user.wallet_balance or 0))
+    if wallet_balance < MIN_SIGNAL_ACTIVATION_BALANCE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Insufficient wallet balance to participate",
+            detail="Minimum $100 wallet balance is required to activate a signal",
         )
 
     # 6. Calculate participation (use full wallet balance)
-    participation_amount = user.wallet_balance
-    entry_balance = user.wallet_balance
+    participation_amount = wallet_balance
+    entry_balance = wallet_balance
 
     # 7. Create user signal entry
     now = datetime.now(timezone.utc)
@@ -165,6 +200,8 @@ async def activate_signal(user: User, signal_code: str, db: AsyncSession) -> Use
         ends_at=now + timedelta(hours=signal.duration_hours),
     )
     db.add(entry)
+    entry.signal = signal
+    setattr(entry, "signal_public_id", signal.public_id)
 
     # 8. Mark code as used
     code.used = True
@@ -180,12 +217,17 @@ async def get_user_signal_history(
     """Get user's signal participation history."""
     result = await db.execute(
         select(UserSignalEntry)
+        .options(selectinload(UserSignalEntry.signal))
         .where(UserSignalEntry.user_id == user.id)
         .order_by(UserSignalEntry.started_at.desc())
         .offset(skip)
         .limit(limit)
     )
-    return result.scalars().all()
+    entries = result.scalars().all()
+    for entry in entries:
+        signal_public_id = entry.signal.public_id if entry.signal else str(entry.signal_id)
+        setattr(entry, "signal_public_id", signal_public_id)
+    return entries
 
 
 async def process_completed_signals(db: AsyncSession) -> int:

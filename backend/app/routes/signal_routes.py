@@ -55,7 +55,7 @@ async def activate_signal(
     Flow:
     1. Validate code exists and is not used
     2. Check code has not expired
-    3. Verify user has sufficient wallet balance
+    3. Verify user has minimum $100 wallet balance
     4. Create signal entry with user's current balance
     5. Mark code as used
     """

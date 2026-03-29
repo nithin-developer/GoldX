@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -95,8 +95,25 @@ async def set_withdrawal_password(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Set or update the withdrawal password for enhanced wallet security."""
+    """Set or update withdrawal password. Updating requires current password."""
+    new_password = data.new_withdrawal_password or data.withdrawal_password
+    if not new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="new_withdrawal_password is required",
+        )
+
+    had_withdrawal_password = current_user.withdrawal_password_hash is not None
     await wallet_service.set_withdrawal_password(
-        current_user, data.withdrawal_password, db
+        current_user,
+        new_password,
+        data.current_withdrawal_password,
+        db,
     )
-    return MessageResponse(message="Withdrawal password set successfully")
+    return MessageResponse(
+        message=(
+            "Withdrawal password updated successfully"
+            if had_withdrawal_password
+            else "Withdrawal password set successfully"
+        )
+    )

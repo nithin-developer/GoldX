@@ -79,7 +79,7 @@ export function SignalsView() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => signalService.deleteSignal(id),
+    mutationFn: (id: string) => signalService.deleteSignal(id),
     onSuccess: () => {
       toast.success('Signal deleted');
       queryClient.invalidateQueries({ queryKey: ['signals'] });
@@ -88,7 +88,7 @@ export function SignalsView() {
   });
 
   const codeMutation = useMutation({
-    mutationFn: (signalId: number) => signalService.generateCode(signalId),
+    mutationFn: (signalId: string) => signalService.generateCode(signalId),
     onSuccess: (result) => {
       setCodeResult(result);
       setCodeOpen(true);
@@ -113,6 +113,31 @@ export function SignalsView() {
   };
 
   const signals: SignalData[] = data ?? [];
+  const formatCreatedAt = (value?: string) => {
+    if (!value) {
+      return '--';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return '--';
+    }
+
+    return parsed.toLocaleString();
+  };
+
+  const expiresAtLabel = (() => {
+    if (!codeResult?.expires_at) {
+      return '--';
+    }
+
+    const parsed = new Date(codeResult.expires_at);
+    if (Number.isNaN(parsed.getTime())) {
+      return '--';
+    }
+
+    return parsed.toLocaleString();
+  })();
 
   return (
     <DashboardContent>
@@ -139,13 +164,14 @@ export function SignalsView() {
                 <TableCell>Profit %</TableCell>
                 <TableCell>Duration (h)</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Created At</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     <CircularProgress size={24} />
                   </TableCell>
                 </TableRow>
@@ -153,7 +179,7 @@ export function SignalsView() {
 
               {!isLoading && signals.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={7} align="center">
                     No signals found.
                   </TableCell>
                 </TableRow>
@@ -172,6 +198,7 @@ export function SignalsView() {
                       label={signal.status}
                     />
                   </TableCell>
+                  <TableCell>{formatCreatedAt(signal.created_at)}</TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Button
@@ -180,7 +207,7 @@ export function SignalsView() {
                         onClick={() => codeMutation.mutate(signal.id)}
                         disabled={codeMutation.isPending}
                       >
-                        Generate Code
+                        Show Code
                       </Button>
                       <IconButton
                         color="error"
@@ -255,7 +282,10 @@ export function SignalsView() {
             <Stack spacing={2} sx={{ mt: 1 }}>
               <TextField value={codeResult.code} multiline minRows={3} inputProps={{ readOnly: true }} />
               <Typography variant="body2" color="text.secondary">
-                Expires at: {new Date(codeResult.expires_at).toLocaleString()}
+                Expires at: {expiresAtLabel}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Usage: {codeResult.used ? 'Already used' : 'Not used yet'}
               </Typography>
             </Stack>
           )}

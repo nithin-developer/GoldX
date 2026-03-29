@@ -116,10 +116,26 @@ async def create_withdrawal(
 
 
 async def set_withdrawal_password(
-    user: User, withdrawal_password: str, db: AsyncSession
+    user: User,
+    new_withdrawal_password: str,
+    current_withdrawal_password: str | None,
+    db: AsyncSession,
 ) -> None:
-    """Set or update the withdrawal password."""
-    user.withdrawal_password_hash = hash_password(withdrawal_password)
+    """Set or update the withdrawal password with verification for updates."""
+    if user.withdrawal_password_hash:
+        if not current_withdrawal_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current withdrawal password is required to update password",
+            )
+
+        if not verify_password(current_withdrawal_password, user.withdrawal_password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current withdrawal password is incorrect",
+            )
+
+    user.withdrawal_password_hash = hash_password(new_withdrawal_password)
     await db.flush()
 
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin
@@ -51,7 +51,7 @@ async def create_signal(
 
 @router.put("/{signal_id}", response_model=SignalResponse)
 async def update_signal(
-    signal_id: int,
+    signal_id: str,
     data: UpdateSignalRequest,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -64,7 +64,7 @@ async def update_signal(
 
 @router.delete("/{signal_id}", response_model=MessageResponse)
 async def delete_signal(
-    signal_id: int,
+    signal_id: str,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -73,20 +73,21 @@ async def delete_signal(
     return MessageResponse(message="Signal deleted successfully")
 
 
-@router.post("/{signal_id}/generate-code", response_model=list[SignalCodeResponse], status_code=201)
+@router.post("/{signal_id}/generate-code", response_model=SignalCodeResponse, status_code=201)
 async def generate_signal_codes(
-    signal_id: int,
-    data: GenerateCodeRequest,
+    signal_id: str,
+    data: GenerateCodeRequest = Body(default_factory=GenerateCodeRequest),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Generate activation codes for a signal (admin only).
+    Generate or retrieve the single activation code for a signal (admin only).
 
-    - **expires_in_hours**: How long the codes remain valid (default 24h, max 720h)
-    - **count**: Number of codes to generate (default 1, max 100)
+    If no request body is sent, defaults are used:
+    - **expires_in_hours**: 24h (max 720h)
+    - **count**: must be 1 (only one code per signal)
     """
-    codes = await signal_service.generate_signal_codes(
+    code = await signal_service.generate_signal_codes(
         signal_id, data.expires_in_hours, data.count, db
     )
-    return [SignalCodeResponse.model_validate(c) for c in codes]
+    return SignalCodeResponse.model_validate(code)

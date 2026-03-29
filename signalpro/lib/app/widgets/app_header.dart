@@ -8,10 +8,12 @@ class AppHeader extends StatefulWidget {
     required this.title,
     super.key,
     this.subtitle,
+    this.onNotificationsTap,
   });
 
   final String title;
   final String? subtitle;
+  final Future<void> Function()? onNotificationsTap;
 
   @override
   State<AppHeader> createState() => _AppHeaderState();
@@ -32,6 +34,20 @@ class _AppHeaderState extends State<AppHeader> {
     setState(() {
       _unreadFuture = _api!.getUnreadNotificationsCount(forceRefresh: true);
     });
+  }
+
+  Future<void> _handleNotificationsTap() async {
+    if (widget.onNotificationsTap == null) {
+      _refreshUnread();
+      return;
+    }
+
+    await widget.onNotificationsTap!.call();
+    if (!mounted) {
+      return;
+    }
+
+    _refreshUnread();
   }
 
   @override
@@ -55,7 +71,7 @@ class _AppHeaderState extends State<AppHeader> {
                 clipBehavior: Clip.none,
                 children: [
                   IconButton(
-                    onPressed: _refreshUnread,
+                    onPressed: _handleNotificationsTap,
                     icon: const Icon(Icons.notifications_none_rounded, size: 26),
                   ),
                   if (count > 0)
@@ -70,7 +86,7 @@ class _AppHeaderState extends State<AppHeader> {
                         ),
                         constraints: const BoxConstraints(minWidth: 18),
                         child: Text(
-                          count > 99 ? '99+' : '$count',
+                          count > 9 ? '9+' : '$count',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Numeric, ForeignKey
@@ -10,6 +11,13 @@ class Signal(Base):
     __tablename__ = "signals"
 
     id = Column(Integer, primary_key=True, index=True)
+    public_id = Column(
+        String(36),
+        unique=True,
+        nullable=False,
+        default=lambda: str(uuid.uuid4()),
+        index=True,
+    )
     asset = Column(String(20), nullable=False)       # e.g., BTC, ETH
     direction = Column(String(10), nullable=False)    # "long" or "short"
     profit_percent = Column(Float, nullable=False)
@@ -27,7 +35,7 @@ class Signal(Base):
     entries = relationship("UserSignalEntry", back_populates="signal", lazy="selectin")
 
     def __repr__(self):
-        return f"<Signal(id={self.id}, asset={self.asset}, direction={self.direction})>"
+        return f"<Signal(public_id={self.public_id}, asset={self.asset}, direction={self.direction})>"
 
 
 class SignalCode(Base):
