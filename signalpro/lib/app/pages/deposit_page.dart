@@ -13,7 +13,8 @@ class DepositPage extends StatefulWidget {
 
 class _DepositPageState extends State<DepositPage> {
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _transactionIdController = TextEditingController();
+  final TextEditingController _transactionIdController =
+      TextEditingController();
   File? _paymentScreenshot;
   double _selectedAmount = 0.0;
   bool _isUploading = false;
@@ -79,7 +80,9 @@ class _DepositPageState extends State<DepositPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Deposit of \$${_selectedAmount.toStringAsFixed(2)} submitted for review'),
+        content: Text(
+          'Deposit of \$${_selectedAmount.toStringAsFixed(2)} submitted for review',
+        ),
         duration: const Duration(seconds: 3),
       ),
     );
@@ -127,10 +130,7 @@ class _DepositPageState extends State<DepositPage> {
                 const SizedBox(height: 8),
                 const Text(
                   '\$12,450.80',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -146,10 +146,7 @@ class _DepositPageState extends State<DepositPage> {
           const SizedBox(height: 20),
           const Text(
             'Deposit Amount',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -163,17 +160,11 @@ class _DepositPageState extends State<DepositPage> {
               hintStyle: const TextStyle(color: AppColors.textMuted),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                borderSide: const BorderSide(color: AppColors.border, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                borderSide: const BorderSide(color: AppColors.border, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -202,28 +193,31 @@ class _DepositPageState extends State<DepositPage> {
           const SizedBox(height: 12),
           const Text(
             'Quick Amounts',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _AmountChip(value: 100, onTap: () => _selectAmount(100))),
+              Expanded(
+                child: _AmountChip(value: 100, onTap: () => _selectAmount(100)),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _AmountChip(value: 500, onTap: () => _selectAmount(500))),
+              Expanded(
+                child: _AmountChip(value: 500, onTap: () => _selectAmount(500)),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _AmountChip(value: 1000, onTap: () => _selectAmount(1000))),
+              Expanded(
+                child: _AmountChip(
+                  value: 1000,
+                  onTap: () => _selectAmount(1000),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
           const Text(
             'Transaction ID (Optional)',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -235,17 +229,11 @@ class _DepositPageState extends State<DepositPage> {
               hintStyle: const TextStyle(color: AppColors.textMuted),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                borderSide: const BorderSide(color: AppColors.border, width: 1),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: AppColors.border,
-                  width: 1,
-                ),
+                borderSide: const BorderSide(color: AppColors.border, width: 1),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -263,10 +251,7 @@ class _DepositPageState extends State<DepositPage> {
           const SizedBox(height: 20),
           const Text(
             'Payment Screenshot',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 12),
           GlassCard(
@@ -303,53 +288,53 @@ class _DepositPageState extends State<DepositPage> {
                   )
                 else
                   _isUploading
-                  ? const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text(
-                            'Uploading...',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
+                      ? const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Column(
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text(
+                                'Uploading...',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            const Icon(
+                              Icons.upload_file_rounded,
+                              size: 48,
+                              color: AppColors.primaryBright,
                             ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Column(
-                      children: [
-                        const Icon(
-                          Icons.upload_file_rounded,
-                          size: 48,
-                          color: AppColors.primaryBright,
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Upload Payment Screenshot',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Please upload a screenshot of your payment',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            PrimaryButton(
+                              text: 'Choose File',
+                              onPressed: _pickImage,
+                              icon: Icons.cloud_upload_rounded,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Upload Payment Screenshot',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Please upload a screenshot of your payment',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        PrimaryButton(
-                          text: 'Choose File',
-                          onPressed: _pickImage,
-                          icon: Icons.cloud_upload_rounded,
-                        ),
-                      ],
-                    ),
               ],
             ),
           ),
@@ -404,14 +389,14 @@ class _DepositPageState extends State<DepositPage> {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.background,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.border,
-                      width: 1,
-                    ),
+                    border: Border.all(color: AppColors.border, width: 1),
                   ),
                   child: Row(
                     children: [
@@ -419,10 +404,7 @@ class _DepositPageState extends State<DepositPage> {
                         child: Text(
                           '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontFamily: 'monospace',
-                          ),
+                          style: TextStyle(fontSize: 14),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -475,10 +457,7 @@ class _AmountChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceSoft,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppColors.border,
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.border, width: 1),
         ),
         child: Center(
           child: Text(

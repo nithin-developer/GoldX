@@ -34,7 +34,7 @@ class _SignalProAppState extends State<SignalProApp> {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'SignalPro',
-        theme: AppTheme.dark(),
+        theme: AppTheme.light(),
         home: const LaunchGate(),
       ),
     );

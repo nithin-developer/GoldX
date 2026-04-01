@@ -25,28 +25,28 @@ class _MarketPageState extends State<MarketPage> {
       pair: 'BTCUSDT',
       tradingViewSymbol: 'BITSTAMP:BTCUSD',
       label: 'BITCOIN / USDT',
-      logoAsset: 'assets/coins/btc.png',
+      logoAsset: 'coins/btc.png',
     ),
     _MarketCoin(
       symbol: 'ETH',
       pair: 'ETHUSDT',
       tradingViewSymbol: 'BINANCE:ETHUSDT',
       label: 'ETHEREUM / USDT',
-      logoAsset: 'assets/coins/eth.png',
+      logoAsset: 'coins/eth.png',
     ),
     _MarketCoin(
       symbol: 'SOL',
       pair: 'SOLUSDT',
       tradingViewSymbol: 'BINANCE:SOLUSDT',
       label: 'SOLANA / USDT',
-      logoAsset: 'assets/coins/sol.png',
+      logoAsset: 'coins/sol.png',
     ),
     _MarketCoin(
       symbol: 'AVAX',
       pair: 'AVAXUSDT',
       tradingViewSymbol: 'BINANCE:AVAXUSDT',
       label: 'AVALANCHE / USDT',
-      logoAsset: 'assets/coins/avax.png',
+      logoAsset: 'coins/avax.png',
     ),
   ];
 
@@ -380,7 +380,7 @@ class _MarketPageState extends State<MarketPage> {
               const SizedBox(height: 8),
               Text(
                 _formatPrice(_selectedPrice),
-                style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w700),
+                style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
               ),
               Text(
                 '${_formatPrice(_selectedPrice)} USD',

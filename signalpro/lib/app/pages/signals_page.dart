@@ -854,9 +854,10 @@ class _SignalCard extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: canActivate ? () => onActivate(item) : null,
-              icon: const Icon(Icons.flash_on_rounded, size: 18),
+              icon: const Icon(Icons.flash_on_rounded, size: 20),
               label: Text(
                 canActivate ? 'Activate Signal' : 'Activation Unavailable',
+                
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -867,13 +868,14 @@ class _SignalCard extends StatelessWidget {
                 disabledForegroundColor: AppColors.textMuted,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
-                  vertical: 14,
+                  vertical: 20,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 textStyle: const TextStyle(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                   letterSpacing: 0.3,
                 ),
                 elevation: 0,

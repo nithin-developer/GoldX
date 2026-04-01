@@ -26,16 +26,22 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   AppTab _currentTab = AppTab.home;
 
-  void _openDeposit() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const DepositPage()));
+  void _openDeposit() => Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const DepositPage()));
 
-  void _openWithdraw() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const WithdrawPage()));
+  void _openWithdraw() => Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const WithdrawPage()));
 
-  void _openSupport() => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SupportChatPage()));
+  void _openSupport() => Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const SupportChatPage()));
 
   Future<void> _openNotifications() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const NotificationsPage()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const NotificationsPage()));
   }
 
   @override
@@ -47,9 +53,13 @@ class _AppShellState extends State<AppShell> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0A1220), Color(0xFF0D1830)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.background,
+              AppColors.surfaceSoft,
+              AppColors.backgroundSecondary,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
         child: SafeArea(
@@ -62,8 +72,12 @@ class _AppShellState extends State<AppShell> {
                         setState(() => _currentTab = AppTab.values[index]);
                       },
                       backgroundColor: Colors.transparent,
-                      selectedIconTheme: const IconThemeData(color: AppColors.primaryBright),
-                      unselectedIconTheme: const IconThemeData(color: AppColors.textMuted),
+                      selectedIconTheme: const IconThemeData(
+                        color: AppColors.primaryBright,
+                      ),
+                      unselectedIconTheme: const IconThemeData(
+                        color: AppColors.textMuted,
+                      ),
                       labelType: NavigationRailLabelType.all,
                       destinations: const [
                         NavigationRailDestination(
@@ -125,8 +139,16 @@ class _AppShellState extends State<AppShell> {
               backgroundColor: AppColors.surface.withValues(alpha: 0.95),
               indicatorColor: AppColors.primary.withValues(alpha: 0.2),
               destinations: const [
-                NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-                NavigationDestination(icon: Icon(Icons.bolt_outlined), selectedIcon: Icon(Icons.bolt), label: 'Signals'),
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home),
+                  label: 'Home',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.bolt_outlined),
+                  selectedIcon: Icon(Icons.bolt),
+                  label: 'Signals',
+                ),
                 NavigationDestination(
                   icon: Icon(Icons.candlestick_chart_outlined),
                   selectedIcon: Icon(Icons.candlestick_chart),
@@ -137,7 +159,11 @@ class _AppShellState extends State<AppShell> {
                   selectedIcon: Icon(Icons.groups_rounded),
                   label: 'Referrals',
                 ),
-                NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline),
+                  selectedIcon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
               ],
             ),
     );
@@ -192,7 +218,12 @@ class _BodyLayout extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Expanded(child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: child)),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            child: child,
+          ),
+        ),
       ],
     );
   }
