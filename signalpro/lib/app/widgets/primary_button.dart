@@ -21,19 +21,20 @@ class PrimaryButton extends StatelessWidget {
         onPressed: onPressed,
         icon: icon == null
             ? const SizedBox.shrink()
-            : Icon(icon, size: 18, color: AppColors.background),
+            : Icon(icon, size: 20, color: AppColors.background),
         label: Text(
           text,
           style: const TextStyle(
             color: AppColors.background,
             fontWeight: FontWeight.w700,
+            fontSize: 16,
           ),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           disabledBackgroundColor: AppColors.surfaceSoft,
           disabledForegroundColor: AppColors.textMuted,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),

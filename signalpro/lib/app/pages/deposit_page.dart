@@ -155,7 +155,21 @@ class _DepositPageState extends State<DepositPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: AppColors.background,
-              prefixText: '\$ ',
+              prefixIcon: const Padding(
+                padding: EdgeInsets.only(left: 16, right: 8),
+                child: Text(
+                  '\$',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 0,
+                minHeight: 0,
+              ),
               hintText: '0.00',
               hintStyle: const TextStyle(color: AppColors.textMuted),
               border: OutlineInputBorder(
@@ -174,7 +188,7 @@ class _DepositPageState extends State<DepositPage> {
                 ),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
+                horizontal: 0,
                 vertical: 18,
               ),
             ),
@@ -330,6 +344,7 @@ class _DepositPageState extends State<DepositPage> {
                             const SizedBox(height: 16),
                             PrimaryButton(
                               text: 'Choose File',
+
                               onPressed: _pickImage,
                               icon: Icons.cloud_upload_rounded,
                             ),
@@ -466,6 +481,7 @@ class _AmountChip extends StatelessWidget {
               color: AppColors.primaryBright,
               fontWeight: FontWeight.w700,
               fontSize: 14,
+              letterSpacing: 1.2,
             ),
           ),
         ),

@@ -283,6 +283,7 @@ class _BalanceHeroCard extends StatelessWidget {
                             'TOTAL BALANCE',
                             style: TextStyle(
                               fontSize: 10,
+                              fontFamily: 'Inter',
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.1,
                               color: AppColors.secondary,
@@ -293,7 +294,8 @@ class _BalanceHeroCard extends StatelessWidget {
                             '\$42,892.50',
                             style: TextStyle(
                               fontSize: 38,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: 'Inter',
                               color: AppColors.onSurface,
                               height: 1,
                             ),
@@ -318,6 +320,7 @@ class _BalanceHeroCard extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1,
                               color: AppColors.secondary,
+                              fontFamily: 'Inter',
                             ),
                           ),
                           SizedBox(height: 4),
@@ -327,6 +330,7 @@ class _BalanceHeroCard extends StatelessWidget {
                               fontSize: 19,
                               fontWeight: FontWeight.w700,
                               color: AppColors.goldSuccessTint,
+                              fontFamily: 'Inter',
                             ),
                           ),
                         ],
@@ -474,6 +478,7 @@ class _SectionTitle extends StatelessWidget {
             title,
             style: const TextStyle(
               fontSize: 21,
+              
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
               color: AppColors.onSurface,

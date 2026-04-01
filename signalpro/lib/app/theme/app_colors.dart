@@ -33,7 +33,7 @@ class AppColors {
   static const Color danger = Color(0xFFEF4444);
 
   // Extra shared tone
-  static const Color tertiary = Color(0xFFF4F1EE);
+  static const Color tertiary = Color.fromARGB(255, 227, 180, 133);
 
   // Skeleton shades
   static const Color skeletonBase = Color(0xFFE2E8F0);

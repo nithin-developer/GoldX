@@ -98,9 +98,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
                       child: _BalanceCard(
                         title: 'Uncleared',
                         value: '\$4,690',
-                        icon: Icons.hourglass_empty_rounded,
-                        color: AppColors.tertiary,
-                        warn: true,
+                        icon: Icons.pending_rounded,
+                        color: AppColors.primary,
+                        // warn: true,
                       ),
                     ),
                   ],
@@ -112,7 +112,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
           _InputField(
             label: 'WITHDRAWAL AMOUNT',
             controller: _amountController,
-            prefix: '\$ ',
+            showCurrencyPrefix: true,
             hint: '0.00',
             keyboardType: TextInputType.number,
           ),
@@ -138,12 +138,12 @@ class _WithdrawPageState extends State<WithdrawPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: const BoxDecoration(
-                    color: AppColors.tertiary,
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.info_outline_rounded,
-                    size: 16,
+                    size: 18,
                     color: AppColors.background,
                   ),
                 ),
@@ -181,14 +181,12 @@ class _BalanceCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
-    this.warn = false,
   });
 
   final String title;
   final String value;
   final IconData icon;
   final Color color;
-  final bool warn;
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +220,7 @@ class _BalanceCard extends StatelessWidget {
             value,
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              color: warn ? AppColors.tertiary : AppColors.textPrimary,
+              color: AppColors.textPrimary,
               fontSize: 16,
             ),
           ),
@@ -236,7 +234,7 @@ class _InputField extends StatelessWidget {
   const _InputField({
     required this.label,
     required this.controller,
-    this.prefix,
+    this.showCurrencyPrefix = false,
     required this.hint,
     this.suffix,
     this.obscureText = false,
@@ -246,7 +244,7 @@ class _InputField extends StatelessWidget {
 
   final String label;
   final TextEditingController controller;
-  final String? prefix;
+  final bool showCurrencyPrefix;
   final String hint;
   final IconData? suffix;
   final bool obscureText;
@@ -276,35 +274,48 @@ class _InputField extends StatelessWidget {
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.background,
-            prefixText: prefix,
+            prefixIcon: showCurrencyPrefix
+                ? const Padding(
+                    padding: EdgeInsets.only(left: 16, right: 8),
+                    child: Text(
+                      '\$',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                : null,
+            prefixIconConstraints: showCurrencyPrefix
+                ? const BoxConstraints(minWidth: 0, minHeight: 0)
+                : null,
             suffixIcon: suffix == null
                 ? null
-                : Icon(suffix, size: 18, color: AppColors.textSecondary),
+                : const Padding(
+                    padding: EdgeInsets.only(right: 16),
+                    child: Icon(
+                      Icons.lock_outline_rounded,
+                      size: 20,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
             hintText: hint,
             hintStyle: const TextStyle(color: AppColors.textMuted),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: AppColors.border,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: AppColors.border, width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: AppColors.border,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: AppColors.border, width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
             ),
             contentPadding: EdgeInsets.symmetric(
-              horizontal: 16,
+              horizontal: showCurrencyPrefix ? 0 : 16,
               vertical: maxLines > 1 ? 16 : 18,
             ),
           ),

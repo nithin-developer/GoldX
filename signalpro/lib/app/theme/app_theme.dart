@@ -28,14 +28,16 @@ class AppTheme {
     return ThemeData(
       brightness: Brightness.light,
       useMaterial3: true,
-      fontFamily: GoogleFonts.inter().fontFamily,
+      fontFamily: 'Inter',
       scaffoldBackgroundColor: AppColors.background,
       colorScheme: colorScheme,
       textTheme: textTheme.apply(
+        fontFamily: 'Inter',
         bodyColor: AppColors.textPrimary,
         displayColor: AppColors.textPrimary,
       ),
       primaryTextTheme: textTheme.apply(
+        fontFamily: 'Inter',
         bodyColor: AppColors.textPrimary,
         displayColor: AppColors.textPrimary,
       ),
@@ -46,6 +48,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         foregroundColor: AppColors.textPrimary,
         centerTitle: false,
+        titleSpacing: 4,
       ),
 
       iconTheme: const IconThemeData(color: AppColors.secondary),
