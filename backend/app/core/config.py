@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Trading Signals API"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
+    UPLOADS_DIR: str = "./uploads"
 
     # CORS
     CORS_ORIGINS: str = (

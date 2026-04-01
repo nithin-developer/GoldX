@@ -50,6 +50,63 @@ def _ensure_signal_public_ids(sync_conn) -> None:
     )
 
 
+def _ensure_wallet_public_ids_and_payment_proofs(sync_conn) -> None:
+    """Backfill UUID-style public ids for deposits/withdrawals and payment proof column."""
+    inspector = inspect(sync_conn)
+    table_names = set(inspector.get_table_names())
+
+    if "deposits" in table_names:
+        deposit_columns = {col["name"] for col in inspector.get_columns("deposits")}
+
+        if "public_id" not in deposit_columns:
+            sync_conn.execute(text("ALTER TABLE deposits ADD COLUMN public_id VARCHAR(36)"))
+
+        if "payment_proof_filename" not in deposit_columns:
+            sync_conn.execute(
+                text("ALTER TABLE deposits ADD COLUMN payment_proof_filename VARCHAR(255)")
+            )
+
+        deposit_rows = sync_conn.execute(
+            text("SELECT id FROM deposits WHERE public_id IS NULL OR public_id = ''")
+        ).fetchall()
+
+        for row in deposit_rows:
+            sync_conn.execute(
+                text("UPDATE deposits SET public_id = :public_id WHERE id = :id"),
+                {"public_id": str(uuid.uuid4()), "id": row[0]},
+            )
+
+        sync_conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_deposits_public_id ON deposits (public_id)"
+            )
+        )
+
+    if "withdrawals" in table_names:
+        withdrawal_columns = {col["name"] for col in inspector.get_columns("withdrawals")}
+
+        if "public_id" not in withdrawal_columns:
+            sync_conn.execute(
+                text("ALTER TABLE withdrawals ADD COLUMN public_id VARCHAR(36)")
+            )
+
+        withdrawal_rows = sync_conn.execute(
+            text("SELECT id FROM withdrawals WHERE public_id IS NULL OR public_id = ''")
+        ).fetchall()
+
+        for row in withdrawal_rows:
+            sync_conn.execute(
+                text("UPDATE withdrawals SET public_id = :public_id WHERE id = :id"),
+                {"public_id": str(uuid.uuid4()), "id": row[0]},
+            )
+
+        sync_conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_withdrawals_public_id ON withdrawals (public_id)"
+            )
+        )
+
+
 async def get_db() -> AsyncSession:
     """Dependency that provides an async database session."""
     async with async_session_factory() as session:
@@ -66,9 +123,10 @@ async def get_db() -> AsyncSession:
 async def init_db():
     """Create all database tables."""
     async with engine.begin() as conn:
-        from app.models import user, signal, wallet, referral, notification  # noqa: F401
+        from app.models import user, signal, wallet, referral, notification, system_settings  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_ensure_signal_public_ids)
+        await conn.run_sync(_ensure_wallet_public_ids_and_payment_proofs)
 
 
 async def close_db():

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -25,10 +26,18 @@ class Deposit(Base):
     __tablename__ = "deposits"
 
     id = Column(Integer, primary_key=True, index=True)
+    public_id = Column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid4()),
+    )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     amount = Column(Numeric(precision=18, scale=2), nullable=False)
     status = Column(String(20), nullable=False, default="pending")  # pending, approved, rejected
     transaction_ref = Column(String(255), nullable=True)
+    payment_proof_filename = Column(String(255), nullable=True)
     admin_note = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
@@ -48,6 +57,13 @@ class Withdrawal(Base):
     __tablename__ = "withdrawals"
 
     id = Column(Integer, primary_key=True, index=True)
+    public_id = Column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid4()),
+    )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     amount = Column(Numeric(precision=18, scale=2), nullable=False)
     status = Column(String(20), nullable=False, default="pending")  # pending, approved, rejected

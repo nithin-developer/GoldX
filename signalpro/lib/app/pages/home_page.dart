@@ -225,11 +225,7 @@ class _BalanceHeroCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
-          colors: [
-            AppColors.primary,
-            AppColors.primaryShimmer,
-            AppColors.primaryDark,
-          ],
+          colors: [Color(0xFFD4AF37), Color(0xFFF4F1EE)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -243,30 +239,30 @@ class _BalanceHeroCard extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          Positioned(
-            top: -56,
-            right: -40,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.22),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -64,
-            left: -46,
-            child: Container(
-              width: 190,
-              height: 190,
-              decoration: BoxDecoration(
-                color: AppColors.primaryDark.withValues(alpha: 0.25),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
+          // Positioned(
+          //   top: -56,
+          //   right: -40,
+          //   child: Container(
+          //     width: 170,
+          //     height: 170,
+          //     decoration: BoxDecoration(
+          //       color: Colors.white.withValues(alpha: 0.22),
+          //       shape: BoxShape.circle,
+          //     ),
+          //   ),
+          // ),
+          // Positioned(
+          //   bottom: -64,
+          //   left: -46,
+          //   child: Container(
+          //     width: 190,
+          //     height: 190,
+          //     decoration: BoxDecoration(
+          //       color: AppColors.primaryDark.withValues(alpha: 0.25),
+          //       shape: BoxShape.circle,
+          //     ),
+          //   ),
+          // ),
           const Padding(
             padding: EdgeInsets.all(18),
             child: Column(
@@ -314,7 +310,7 @@ class _BalanceHeroCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'DAILY PROFIT',
+                            'TODAY`S PROFIT',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
@@ -329,7 +325,7 @@ class _BalanceHeroCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 19,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.goldSuccessTint,
+                              color: Color.fromARGB(255, 255, 255, 255),
                               fontFamily: 'Inter',
                             ),
                           ),
@@ -478,7 +474,7 @@ class _SectionTitle extends StatelessWidget {
             title,
             style: const TextStyle(
               fontSize: 21,
-              
+
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
               color: AppColors.onSurface,

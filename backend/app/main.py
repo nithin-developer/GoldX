@@ -1,9 +1,11 @@
 import asyncio
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -20,6 +22,7 @@ from app.routes.support_routes import router as support_router
 from app.routes.admin.users_admin import router as admin_users_router
 from app.routes.admin.signals_admin import router as admin_signals_router
 from app.routes.admin.reports_admin import router as admin_reports_router
+from app.routes.admin.settings_admin import router as admin_settings_router
 
 # Configure logging
 logging.basicConfig(
@@ -125,6 +128,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+uploads_dir = Path(settings.UPLOADS_DIR).resolve()
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+
 
 # Global exception handler
 @app.exception_handler(Exception)
@@ -157,3 +164,4 @@ app.include_router(support_router, prefix=api_prefix)
 app.include_router(admin_users_router, prefix=api_prefix)
 app.include_router(admin_signals_router, prefix=api_prefix)
 app.include_router(admin_reports_router, prefix=api_prefix)
+app.include_router(admin_settings_router, prefix=api_prefix)

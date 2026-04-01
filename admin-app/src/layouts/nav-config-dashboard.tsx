@@ -26,6 +26,16 @@ export const navData: NavItem[] = [
     icon: <Iconify icon="solar:pen-bold" width={24} />,
   },
   {
+    title: 'Deposits',
+    path: '/deposits',
+    icon: <Iconify icon="solar:cart-3-bold" width={24} />,
+  },
+  {
+    title: 'Withdrawals',
+    path: '/withdrawals',
+    icon: <Iconify icon="eva:trending-down-fill" width={24} />,
+  },
+  {
     title: 'Referrals',
     path: '/referrals',
     icon: <Iconify icon="solar:share-bold" width={24} />,
@@ -53,6 +63,11 @@ export const navData: NavItem[] = [
   {
     title: 'Reports',
     path: '/reports',
+    icon: <Iconify icon="solar:settings-bold-duotone" width={24} />,
+  },
+  {
+    title: 'Settings',
+    path: '/settings',
     icon: <Iconify icon="solar:settings-bold-duotone" width={24} />,
   },
 ];

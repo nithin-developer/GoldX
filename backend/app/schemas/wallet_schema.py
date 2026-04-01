@@ -36,20 +36,18 @@ class WithdrawRequest(BaseModel):
 
 
 class DepositResponse(BaseModel):
-    id: int
+    id: str
     user_id: int
     amount: Decimal
     status: str
     transaction_ref: Optional[str] = None
+    payment_proof_url: Optional[str] = None
     admin_note: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class WithdrawalResponse(BaseModel):
-    id: int
+    id: str
     user_id: int
     amount: Decimal
     status: str
@@ -57,8 +55,14 @@ class WithdrawalResponse(BaseModel):
     admin_note: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+
+class DepositSettingsResponse(BaseModel):
+    currency: str
+    network: Optional[str] = None
+    wallet_address: Optional[str] = None
+    instructions: Optional[str] = None
+    qr_code_url: Optional[str] = None
+    updated_at: Optional[datetime] = None
 
 
 class AdminDepositAction(BaseModel):

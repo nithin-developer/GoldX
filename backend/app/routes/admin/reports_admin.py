@@ -1,5 +1,5 @@
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import aliased
@@ -30,6 +30,34 @@ from app.services import wallet_service
 
 
 router = APIRouter(prefix="/admin", tags=["Admin - Reports & Management"])
+
+
+def _build_deposit_response(deposit, base_url: str | None = None) -> DepositResponse:
+    return DepositResponse(
+        id=deposit.public_id,
+        user_id=deposit.user_id,
+        amount=deposit.amount,
+        status=deposit.status,
+        transaction_ref=deposit.transaction_ref,
+        payment_proof_url=wallet_service.build_payment_proof_url(
+            deposit.payment_proof_filename,
+            base_url,
+        ),
+        admin_note=deposit.admin_note,
+        created_at=deposit.created_at,
+    )
+
+
+def _build_withdrawal_response(withdrawal) -> WithdrawalResponse:
+    return WithdrawalResponse(
+        id=withdrawal.public_id,
+        user_id=withdrawal.user_id,
+        amount=withdrawal.amount,
+        status=withdrawal.status,
+        wallet_address=withdrawal.wallet_address,
+        admin_note=withdrawal.admin_note,
+        created_at=withdrawal.created_at,
+    )
 
 
 async def _build_support_chat_payload(db: AsyncSession) -> list[dict]:
@@ -149,6 +177,7 @@ async def get_reports(
 # --- Deposit Management ---
 @router.get("/deposits", response_model=list[DepositResponse])
 async def list_all_deposits(
+    request: Request,
     status: str = Query(None, pattern="^(pending|approved|rejected)$"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -162,31 +191,36 @@ async def list_all_deposits(
     query = query.order_by(Deposit.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     deposits = result.scalars().all()
-    return [DepositResponse.model_validate(d) for d in deposits]
+    base_url = str(request.base_url).rstrip("/")
+    return [_build_deposit_response(d, base_url) for d in deposits]
 
 
 @router.put("/deposits/{deposit_id}/approve", response_model=DepositResponse)
 async def approve_deposit(
-    deposit_id: int,
+    request: Request,
+    deposit_id: str,
     data: AdminDepositAction,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Approve a pending deposit and credit user's wallet (admin only)."""
     deposit = await wallet_service.approve_deposit(deposit_id, data.admin_note, db)
-    return DepositResponse.model_validate(deposit)
+    base_url = str(request.base_url).rstrip("/")
+    return _build_deposit_response(deposit, base_url)
 
 
 @router.put("/deposits/{deposit_id}/reject", response_model=DepositResponse)
 async def reject_deposit(
-    deposit_id: int,
+    request: Request,
+    deposit_id: str,
     data: AdminDepositAction,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Reject a pending deposit (admin only)."""
     deposit = await wallet_service.reject_deposit(deposit_id, data.admin_note, db)
-    return DepositResponse.model_validate(deposit)
+    base_url = str(request.base_url).rstrip("/")
+    return _build_deposit_response(deposit, base_url)
 
 
 # --- Withdrawal Management ---
@@ -205,12 +239,12 @@ async def list_all_withdrawals(
     query = query.order_by(Withdrawal.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     withdrawals = result.scalars().all()
-    return [WithdrawalResponse.model_validate(w) for w in withdrawals]
+    return [_build_withdrawal_response(w) for w in withdrawals]
 
 
 @router.put("/withdrawals/{withdrawal_id}/approve", response_model=WithdrawalResponse)
 async def approve_withdrawal(
-    withdrawal_id: int,
+    withdrawal_id: str,
     data: AdminWithdrawalAction,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -219,12 +253,12 @@ async def approve_withdrawal(
     withdrawal = await wallet_service.approve_withdrawal(
         withdrawal_id, data.admin_note, db
     )
-    return WithdrawalResponse.model_validate(withdrawal)
+    return _build_withdrawal_response(withdrawal)
 
 
 @router.put("/withdrawals/{withdrawal_id}/reject", response_model=WithdrawalResponse)
 async def reject_withdrawal(
-    withdrawal_id: int,
+    withdrawal_id: str,
     data: AdminWithdrawalAction,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -233,7 +267,7 @@ async def reject_withdrawal(
     withdrawal = await wallet_service.reject_withdrawal(
         withdrawal_id, data.admin_note, db
     )
-    return WithdrawalResponse.model_validate(withdrawal)
+    return _build_withdrawal_response(withdrawal)
 
 
 # --- Notifications ---

@@ -1,10 +1,179 @@
 from decimal import Decimal
+from pathlib import Path
+from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
+from app.core.config import settings
 from app.models.user import User
 from app.models.wallet import WalletTransaction, Deposit, Withdrawal
+from app.models.system_settings import DepositWalletSetting
 from app.core.security import hash_password, verify_password
+
+
+ALLOWED_QR_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+ALLOWED_PAYMENT_PROOF_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def get_qr_code_directory() -> Path:
+    directory = Path(settings.UPLOADS_DIR).resolve() / "qr_codes"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def get_qr_code_path(filename: str) -> Path:
+    return get_qr_code_directory() / filename
+
+
+def build_qr_code_url(filename: str | None, base_url: str | None = None) -> str | None:
+    if not filename:
+        return None
+
+    relative = f"/uploads/qr_codes/{filename}"
+    if not base_url:
+        return relative
+
+    return f"{base_url.rstrip('/')}{relative}"
+
+
+def get_payment_proof_directory() -> Path:
+    directory = Path(settings.UPLOADS_DIR).resolve() / "payment_proofs"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def get_payment_proof_path(filename: str) -> Path:
+    return get_payment_proof_directory() / filename
+
+
+def build_payment_proof_url(filename: str | None, base_url: str | None = None) -> str | None:
+    if not filename:
+        return None
+
+    relative = f"/uploads/payment_proofs/{filename}"
+    if not base_url:
+        return relative
+
+    return f"{base_url.rstrip('/')}{relative}"
+
+
+async def save_payment_proof(upload: UploadFile) -> str:
+    extension = Path(upload.filename or "").suffix.lower()
+    if not extension:
+        extension = ".png"
+
+    if extension not in ALLOWED_PAYMENT_PROOF_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment proof must be an image (.png, .jpg, .jpeg, .webp)",
+        )
+
+    if upload.content_type and not upload.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded payment proof must be an image",
+        )
+
+    file_content = await upload.read()
+    if not file_content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded payment proof file is empty",
+        )
+
+    filename = f"deposit_proof_{uuid4().hex}{extension}"
+    file_path = get_payment_proof_directory() / filename
+    file_path.write_bytes(file_content)
+    return filename
+
+
+def delete_payment_proof(filename: str | None) -> None:
+    if not filename:
+        return
+
+    path = get_payment_proof_path(filename)
+    if path.exists():
+        path.unlink()
+
+
+async def get_or_create_deposit_settings(db: AsyncSession) -> DepositWalletSetting:
+    result = await db.execute(select(DepositWalletSetting).limit(1))
+    settings_data = result.scalar_one_or_none()
+
+    if settings_data:
+        return settings_data
+
+    settings_data = DepositWalletSetting(
+        currency="USDT",
+        network="TRC20",
+        wallet_address=None,
+        instructions=None,
+        qr_code_filename=None,
+    )
+    db.add(settings_data)
+    await db.flush()
+    return settings_data
+
+
+async def update_deposit_settings(
+    db: AsyncSession,
+    currency: str,
+    network: str | None,
+    wallet_address: str | None,
+    instructions: str | None,
+    qr_code: UploadFile | None,
+) -> DepositWalletSetting:
+    settings_data = await get_or_create_deposit_settings(db)
+
+    normalized_currency = (currency or settings_data.currency or "USDT").strip().upper()
+    settings_data.currency = normalized_currency or "USDT"
+    settings_data.network = network.strip().upper() if network and network.strip() else None
+    settings_data.wallet_address = (
+        wallet_address.strip() if wallet_address and wallet_address.strip() else None
+    )
+    settings_data.instructions = (
+        instructions.strip() if instructions and instructions.strip() else None
+    )
+
+    if qr_code:
+        extension = Path(qr_code.filename or "").suffix.lower()
+        if not extension:
+            extension = ".png"
+
+        if extension not in ALLOWED_QR_EXTENSIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="QR code must be an image (.png, .jpg, .jpeg, .webp)",
+            )
+
+        if qr_code.content_type and not qr_code.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded QR code file must be an image",
+            )
+
+        file_content = await qr_code.read()
+        if not file_content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded QR code file is empty",
+            )
+
+        qr_code_dir = get_qr_code_directory()
+        new_filename = f"deposit_qr_{uuid4().hex}{extension}"
+        new_path = qr_code_dir / new_filename
+        new_path.write_bytes(file_content)
+
+        old_filename = settings_data.qr_code_filename
+        settings_data.qr_code_filename = new_filename
+
+        if old_filename and old_filename != new_filename:
+            old_path = qr_code_dir / old_filename
+            if old_path.exists():
+                old_path.unlink()
+
+    await db.flush()
+    return settings_data
 
 
 async def get_wallet_summary(user: User, db: AsyncSession) -> dict:
@@ -47,7 +216,11 @@ async def get_transactions(
 
 
 async def create_deposit(
-    user: User, amount: Decimal, transaction_ref: str | None, db: AsyncSession
+    user: User,
+    amount: Decimal,
+    transaction_ref: str | None,
+    payment_proof_filename: str | None,
+    db: AsyncSession,
 ) -> Deposit:
     """Create a new deposit request (pending admin approval)."""
     deposit = Deposit(
@@ -55,6 +228,7 @@ async def create_deposit(
         amount=amount,
         status="pending",
         transaction_ref=transaction_ref,
+        payment_proof_filename=payment_proof_filename,
     )
     db.add(deposit)
     await db.flush()
@@ -139,9 +313,13 @@ async def set_withdrawal_password(
     await db.flush()
 
 
-async def approve_deposit(deposit_id: int, admin_note: str | None, db: AsyncSession) -> Deposit:
+async def approve_deposit(
+    deposit_public_id: str,
+    admin_note: str | None,
+    db: AsyncSession,
+) -> Deposit:
     """Admin approves a deposit — credits the user's wallet."""
-    result = await db.execute(select(Deposit).where(Deposit.id == deposit_id))
+    result = await db.execute(select(Deposit).where(Deposit.public_id == deposit_public_id))
     deposit = result.scalar_one_or_none()
 
     if not deposit:
@@ -165,6 +343,10 @@ async def approve_deposit(deposit_id: int, admin_note: str | None, db: AsyncSess
         description=f"Deposit approved (ref: {deposit.transaction_ref or 'N/A'})",
     )
     db.add(txn)
+
+    delete_payment_proof(deposit.payment_proof_filename)
+    deposit.payment_proof_filename = None
+
     await db.flush()
 
     # Update referral deposit tracking
@@ -185,9 +367,13 @@ async def approve_deposit(deposit_id: int, admin_note: str | None, db: AsyncSess
     return deposit
 
 
-async def reject_deposit(deposit_id: int, admin_note: str | None, db: AsyncSession) -> Deposit:
+async def reject_deposit(
+    deposit_id: str,
+    admin_note: str | None,
+    db: AsyncSession,
+) -> Deposit:
     """Admin rejects a deposit."""
-    result = await db.execute(select(Deposit).where(Deposit.id == deposit_id))
+    result = await db.execute(select(Deposit).where(Deposit.public_id == deposit_id))
     deposit = result.scalar_one_or_none()
 
     if not deposit:
@@ -202,10 +388,14 @@ async def reject_deposit(deposit_id: int, admin_note: str | None, db: AsyncSessi
 
 
 async def approve_withdrawal(
-    withdrawal_id: int, admin_note: str | None, db: AsyncSession
+    withdrawal_id: str,
+    admin_note: str | None,
+    db: AsyncSession,
 ) -> Withdrawal:
     """Admin approves a withdrawal — debits the user's wallet."""
-    result = await db.execute(select(Withdrawal).where(Withdrawal.id == withdrawal_id))
+    result = await db.execute(
+        select(Withdrawal).where(Withdrawal.public_id == withdrawal_id)
+    )
     withdrawal = result.scalar_one_or_none()
 
     if not withdrawal:
@@ -239,10 +429,14 @@ async def approve_withdrawal(
 
 
 async def reject_withdrawal(
-    withdrawal_id: int, admin_note: str | None, db: AsyncSession
+    withdrawal_id: str,
+    admin_note: str | None,
+    db: AsyncSession,
 ) -> Withdrawal:
     """Admin rejects a withdrawal."""
-    result = await db.execute(select(Withdrawal).where(Withdrawal.id == withdrawal_id))
+    result = await db.execute(
+        select(Withdrawal).where(Withdrawal.public_id == withdrawal_id)
+    )
     withdrawal = result.scalar_one_or_none()
 
     if not withdrawal:

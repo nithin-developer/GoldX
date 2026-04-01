@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:signalpro/app/services/api_exception.dart';
+import 'package:signalpro/app/services/auth_scope.dart';
+import 'package:signalpro/app/services/wallet_api.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/primary_button.dart';
@@ -14,31 +18,108 @@ class _WithdrawPageState extends State<WithdrawPage> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  final NumberFormat _currencyFormatter = NumberFormat.currency(
+    symbol: r'$',
+    decimalDigits: 2,
+  );
+
+  WalletApi? _walletApi;
+  WalletSummary _walletSummary = WalletSummary.empty;
+
+  bool _isLoading = true;
   bool _isProcessing = false;
 
-  void _requestWithdrawal() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _walletApi ??= WalletApi(dio: AuthScope.of(context).apiClient.dio);
+
+    if (_isLoading) {
+      _loadWallet();
+    }
+  }
+
+  Future<void> _loadWallet() async {
+    try {
+      final summary = await _walletApi!.getWalletSummary();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _walletSummary = summary;
+      });
+    } on ApiException catch (error) {
+      _showMessage(error.message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _requestWithdrawal() async {
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    final address = _addressController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (amount <= 0) {
+      _showMessage('Please enter a valid withdrawal amount.');
+      return;
+    }
+
+    if (password.isEmpty) {
+      _showMessage('Withdrawal password is required.');
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      await _walletApi!.createWithdrawal(
+        amount: amount,
+        withdrawalPassword: password,
+        walletAddress: address.isEmpty ? null : address,
+      );
 
-    setState(() {
-      _isProcessing = false;
-    });
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage('Withdrawal request submitted successfully.');
+
+      _amountController.clear();
+      _addressController.clear();
+      _passwordController.clear();
+
+      await _loadWallet();
+    } on ApiException catch (error) {
+      _showMessage(error.message);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Withdrawal request submitted successfully'),
-        duration: Duration(seconds: 3),
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 3),
       ),
     );
-
-    // Clear form
-    _amountController.clear();
-    _addressController.clear();
-    _passwordController.clear();
   }
 
   @override
@@ -74,9 +155,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  '\$42,890.42',
-                  style: TextStyle(
+                Text(
+                  _currencyFormatter.format(_walletSummary.balance),
+                  style: const TextStyle(
                     fontSize: 36,
                     color: AppColors.primaryBright,
                     fontWeight: FontWeight.w700,
@@ -87,20 +168,19 @@ class _WithdrawPageState extends State<WithdrawPage> {
                   children: [
                     Expanded(
                       child: _BalanceCard(
-                        title: 'Trading Equity',
-                        value: '\$38,200',
-                        icon: Icons.account_balance_rounded,
+                        title: 'Pending Deposits',
+                        value: _currencyFormatter.format(_walletSummary.pendingDeposits),
+                        icon: Icons.account_balance_wallet_rounded,
                         color: AppColors.success,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _BalanceCard(
-                        title: 'Uncleared',
-                        value: '\$4,690',
+                        title: 'Pending Withdrawals',
+                        value: _currencyFormatter.format(_walletSummary.pendingWithdrawals),
                         icon: Icons.pending_rounded,
                         color: AppColors.primary,
-                        // warn: true,
                       ),
                     ),
                   ],
@@ -114,7 +194,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
             controller: _amountController,
             showCurrencyPrefix: true,
             hint: '0.00',
-            keyboardType: TextInputType.number,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           const SizedBox(height: 16),
           _InputField(
@@ -150,7 +230,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Standard processing time is 24-48 hours. Please ensure the destination address is accurate.',
+                    'Withdrawal requests are reviewed by admin. Make sure your destination details are correct.',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -163,8 +243,12 @@ class _WithdrawPageState extends State<WithdrawPage> {
           ),
           const SizedBox(height: 20),
           PrimaryButton(
-            text: _isProcessing ? 'Processing...' : 'Request Withdrawal',
-            onPressed: _isProcessing ? null : _requestWithdrawal,
+            text: _isProcessing
+                ? 'Processing...'
+                : _isLoading
+                ? 'Loading wallet...'
+                : 'Request Withdrawal',
+            onPressed: (_isProcessing || _isLoading) ? null : _requestWithdrawal,
             icon: _isProcessing
                 ? Icons.hourglass_bottom_rounded
                 : Icons.arrow_forward_rounded,
@@ -204,13 +288,17 @@ class _BalanceCard extends StatelessWidget {
             children: [
               Icon(icon, size: 16, color: color),
               const SizedBox(width: 6),
-              Text(
-                title.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 9,
-                  color: AppColors.textMuted,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.textMuted,
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
@@ -218,7 +306,7 @@ class _BalanceCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
               fontSize: 16,
@@ -278,7 +366,7 @@ class _InputField extends StatelessWidget {
                 ? const Padding(
                     padding: EdgeInsets.only(left: 16, right: 8),
                     child: Text(
-                      '\$',
+                      r'$',
                       style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 16,
