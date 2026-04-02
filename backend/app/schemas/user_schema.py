@@ -35,6 +35,28 @@ class DashboardResponse(BaseModel):
     announcements: list = []
 
 
+class HomeRecentActivityResponse(BaseModel):
+    id: str
+    type: str
+    title: str
+    subtitle: Optional[str] = None
+    amount: Optional[Decimal] = None
+    is_positive: Optional[bool] = None
+    tag: str
+    created_at: datetime
+
+
+class HomeDashboardResponse(BaseModel):
+    balance: Decimal
+    today_profit: Decimal
+    total_profit: Decimal
+    active_signals: int
+    vip_level: int
+    total_referrals: int
+    announcements: list = []
+    recent_activities: list[HomeRecentActivityResponse] = []
+
+
 class AdminUserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None

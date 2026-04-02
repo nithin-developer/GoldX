@@ -1,4 +1,3 @@
-import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from fastapi import HTTPException, status
@@ -12,17 +11,42 @@ from app.core.security import (
     decode_token,
 )
 from app.schemas.auth_schema import RegisterRequest, LoginRequest, TokenResponse
+from app.utils.helpers import (
+    generate_invite_code,
+    is_valid_invite_code,
+    normalize_invite_code,
+)
+
+
+async def _generate_unique_invite_code(db: AsyncSession) -> str:
+    """Generate a unique 8-character invite code."""
+    for _ in range(10):
+        invite_code = generate_invite_code()
+        result = await db.execute(select(User.id).where(User.invite_code == invite_code))
+        if result.scalar_one_or_none() is None:
+            return invite_code
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Unable to generate invite code",
+    )
 
 
 async def register_user(data: RegisterRequest, db: AsyncSession) -> User:
     """Register a new user account."""
     normalized_email = data.email.strip().lower()
-    normalized_invite_code = data.invite_code.strip().upper()
+    normalized_invite_code = normalize_invite_code(data.invite_code)
 
     if not normalized_invite_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invite code is required",
+        )
+
+    if not is_valid_invite_code(normalized_invite_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invite code must be exactly 8 alphanumeric characters",
         )
 
     # Check if email already exists
@@ -47,8 +71,8 @@ async def register_user(data: RegisterRequest, db: AsyncSession) -> User:
             detail="Invalid invite code",
         )
 
-    # Generate unique invite code for the new user
-    invite_code = f"INV{uuid.uuid4().hex[:8].upper()}"
+    # Generate unique invite code for the new user.
+    invite_code = await _generate_unique_invite_code(db)
 
     # Create user
     user = User(
@@ -77,11 +101,17 @@ async def register_user(data: RegisterRequest, db: AsyncSession) -> User:
 
 async def validate_invite_code(invite_code: str, db: AsyncSession) -> None:
     """Ensure invite code exists and is active for referral onboarding."""
-    normalized_invite_code = invite_code.strip().upper()
+    normalized_invite_code = normalize_invite_code(invite_code)
     if not normalized_invite_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invite code is required",
+        )
+
+    if not is_valid_invite_code(normalized_invite_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invite code must be exactly 8 alphanumeric characters",
         )
     
     result = await db.execute(

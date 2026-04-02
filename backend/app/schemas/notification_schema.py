@@ -43,7 +43,7 @@ class MarkNotificationsReadRequest(BaseModel):
 
 
 class CreateNotificationRequest(BaseModel):
-    user_id: Optional[int] = None  # None = broadcast to all
+    user_id: Optional[int] = Field(None, ge=1000000, le=9999999)  # None = broadcast to all
     title: str = Field(..., max_length=500)
     message: str
     type: str = Field(default="system", pattern="^(system|signal|referral|support)$")
@@ -85,8 +85,8 @@ class SendSupportMessageRequest(BaseModel):
 
 
 class AdminSupportReplyRequest(BaseModel):
-    user_id: Optional[int] = None
-    chat_id: Optional[int] = None
+    user_id: Optional[int] = Field(None, ge=1000000, le=9999999)
+    chat_id: Optional[int] = Field(None, ge=1000000, le=9999999)
     message: str = Field(..., min_length=1, max_length=2000)
 
     @model_validator(mode="after")

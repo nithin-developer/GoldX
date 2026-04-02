@@ -16,7 +16,7 @@ class User(Base):
     password_hash = Column(Text, nullable=False)
     role = Column(String(20), nullable=False, default="user")  # "user" or "admin"
     is_active = Column(Boolean, default=True)
-    invite_code = Column(String(50), unique=True, nullable=True, index=True)
+    invite_code = Column(String(8), unique=True, nullable=True, index=True)
     referred_by = Column(Integer, nullable=True)
     wallet_balance = Column(Numeric(precision=18, scale=2), default=0)
     vip_level = Column(Integer, default=0)

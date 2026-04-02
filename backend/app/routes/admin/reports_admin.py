@@ -1,5 +1,6 @@
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Query, Request
+from typing import Annotated
+from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import aliased
@@ -469,7 +470,7 @@ async def list_support_chats(
 
 @router.get("/support/messages/{user_id}", response_model=list[SupportMessageResponse])
 async def get_user_support_messages(
-    user_id: int,
+    user_id: Annotated[int, Path(ge=1000000, le=9999999)],
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     admin: User = Depends(get_current_admin),

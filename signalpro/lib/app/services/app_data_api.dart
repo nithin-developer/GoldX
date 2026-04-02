@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:signalpro/app/models/app_notification.dart';
+import 'package:signalpro/app/models/home_dashboard.dart';
 import 'package:signalpro/app/models/referral_models.dart';
 import 'package:signalpro/app/models/signal_feed_item.dart';
 import 'package:signalpro/app/models/signal_history_item.dart';
@@ -17,6 +18,7 @@ class AppDataApi {
   static List<AppNotification>? _notificationsCache;
   static UserProfile? _profileCache;
   static int? _unreadNotificationsCache;
+  static HomeDashboardData? _homeDashboardCache;
 
   String _signalsCacheKey(String? status) {
     final normalized = status?.trim();
@@ -76,6 +78,10 @@ class AppDataApi {
 
   int? getCachedUnreadNotificationsCount() {
     return _unreadNotificationsCache;
+  }
+
+  HomeDashboardData? getCachedHomeDashboard() {
+    return _homeDashboardCache;
   }
 
   Future<List<AppNotification>> getNotifications({
@@ -359,6 +365,31 @@ class AppDataApi {
       final count = (response.data ?? const []).length;
       _unreadNotificationsCache = count;
       return count;
+    } on DioException catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
+  Future<HomeDashboardData> getHomeDashboard({
+    bool forceRefresh = false,
+    int activityLimit = 5,
+  }) async {
+    if (!forceRefresh && _homeDashboardCache != null) {
+      return _homeDashboardCache!;
+    }
+
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/dashboard/home',
+        queryParameters: {
+          'activity_limit': activityLimit,
+          if (forceRefresh) '_ts': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+
+      final data = HomeDashboardData.fromJson(response.data ?? const {});
+      _homeDashboardCache = data;
+      return data;
     } on DioException catch (error) {
       throw mapDioError(error);
     }

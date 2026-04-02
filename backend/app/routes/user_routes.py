@@ -1,20 +1,23 @@
 from decimal import Decimal
-from fastapi import APIRouter, Depends
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import aliased
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.models.signal import UserSignalEntry
+from app.models.signal import Signal, UserSignalEntry
 from app.models.referral import Referral
 from app.models.notification import Announcement
+from app.models.wallet import Deposit, WalletTransaction, Withdrawal
 from app.schemas.user_schema import (
+    HomeDashboardResponse,
+    HomeRecentActivityResponse,
     UserProfileResponse,
     UpdateProfileRequest,
     DashboardResponse,
 )
-from app.schemas.auth_schema import MessageResponse
-from datetime import datetime, timezone
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -71,6 +74,254 @@ async def update_profile(
 dashboard_router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
+async def _build_dashboard_summary(current_user: User, db: AsyncSession) -> dict:
+    # Active signals for user.
+    active_signals_result = await db.execute(
+        select(func.count(UserSignalEntry.id)).where(
+            UserSignalEntry.user_id == current_user.id,
+            UserSignalEntry.status == "active",
+        )
+    )
+    active_signals = active_signals_result.scalar() or 0
+
+    # Total profit from completed signals.
+    total_profit_result = await db.execute(
+        select(func.coalesce(func.sum(UserSignalEntry.profit_amount), 0)).where(
+            UserSignalEntry.user_id == current_user.id,
+            UserSignalEntry.status == "completed",
+        )
+    )
+    total_profit = total_profit_result.scalar() or Decimal("0")
+
+    # Today's realized signal profit from wallet transactions.
+    now = datetime.now(timezone.utc)
+    day_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    today_profit_result = await db.execute(
+        select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(
+            WalletTransaction.user_id == current_user.id,
+            WalletTransaction.type == "signal_profit",
+            WalletTransaction.created_at >= day_start,
+        )
+    )
+    today_profit = today_profit_result.scalar() or Decimal("0")
+
+    # Total referrals.
+    referral_count_result = await db.execute(
+        select(func.count(Referral.id)).where(Referral.referrer_id == current_user.id)
+    )
+    total_referrals = referral_count_result.scalar() or 0
+
+    # Active announcements.
+    announcements_result = await db.execute(
+        select(Announcement).where(
+            Announcement.is_active == True,  # noqa: E712
+            (Announcement.start_date == None) | (Announcement.start_date <= now),  # noqa: E711
+            (Announcement.end_date == None) | (Announcement.end_date >= now),  # noqa: E711
+        )
+    )
+    announcements = announcements_result.scalars().all()
+
+    announcement_list = [
+        {"id": a.id, "title": a.title, "message": a.message} for a in announcements
+    ]
+
+    return {
+        "balance": current_user.wallet_balance,
+        "active_signals": active_signals,
+        "total_profit": total_profit,
+        "today_profit": today_profit,
+        "vip_level": current_user.vip_level,
+        "total_referrals": total_referrals,
+        "announcements": announcement_list,
+    }
+
+
+async def _build_recent_activities(
+    current_user: User,
+    db: AsyncSession,
+    limit: int,
+) -> list[HomeRecentActivityResponse]:
+    fetch_limit = max(limit * 3, 20)
+    activities: list[HomeRecentActivityResponse] = []
+
+    deposits_result = await db.execute(
+        select(Deposit)
+        .where(Deposit.user_id == current_user.id)
+        .order_by(Deposit.created_at.desc())
+        .limit(fetch_limit)
+    )
+    deposits = deposits_result.scalars().all()
+
+    for deposit in deposits:
+        ref_text = (
+            f"Reference: {deposit.transaction_ref}"
+            if deposit.transaction_ref
+            else "Awaiting admin review"
+        )
+        activities.append(
+            HomeRecentActivityResponse(
+                id=f"deposit:{deposit.public_id}:requested",
+                type="deposit_requested",
+                title="Deposit Request Submitted",
+                subtitle=ref_text,
+                amount=deposit.amount,
+                is_positive=None,
+                tag="DEPOSIT",
+                created_at=deposit.created_at,
+            )
+        )
+
+        if deposit.status in {"approved", "rejected"}:
+            activities.append(
+                HomeRecentActivityResponse(
+                    id=f"deposit:{deposit.public_id}:{deposit.status}",
+                    type=f"deposit_{deposit.status}",
+                    title=(
+                        "Deposit Approved"
+                        if deposit.status == "approved"
+                        else "Deposit Rejected"
+                    ),
+                    subtitle=(
+                        deposit.admin_note
+                        or (
+                            "Funds were credited to your wallet"
+                            if deposit.status == "approved"
+                            else "Request was rejected by admin"
+                        )
+                    ),
+                    amount=deposit.amount,
+                    is_positive=(deposit.status == "approved"),
+                    tag=deposit.status.upper(),
+                    created_at=deposit.updated_at or deposit.created_at,
+                )
+            )
+
+    withdrawals_result = await db.execute(
+        select(Withdrawal)
+        .where(Withdrawal.user_id == current_user.id)
+        .order_by(Withdrawal.created_at.desc())
+        .limit(fetch_limit)
+    )
+    withdrawals = withdrawals_result.scalars().all()
+
+    for withdrawal in withdrawals:
+        activities.append(
+            HomeRecentActivityResponse(
+                id=f"withdrawal:{withdrawal.public_id}:requested",
+                type="withdrawal_requested",
+                title="Withdrawal Request Submitted",
+                subtitle=(
+                    f"Destination: {withdrawal.wallet_address}"
+                    if withdrawal.wallet_address
+                    else "Awaiting admin approval"
+                ),
+                amount=withdrawal.amount,
+                is_positive=None,
+                tag="WITHDRAW",
+                created_at=withdrawal.created_at,
+            )
+        )
+
+        if withdrawal.status in {"approved", "rejected"}:
+            activities.append(
+                HomeRecentActivityResponse(
+                    id=f"withdrawal:{withdrawal.public_id}:{withdrawal.status}",
+                    type=f"withdrawal_{withdrawal.status}",
+                    title=(
+                        "Withdrawal Approved"
+                        if withdrawal.status == "approved"
+                        else "Withdrawal Rejected"
+                    ),
+                    subtitle=(
+                        withdrawal.admin_note
+                        or (
+                            "Funds were debited from your wallet"
+                            if withdrawal.status == "approved"
+                            else "Request was rejected by admin"
+                        )
+                    ),
+                    amount=withdrawal.amount,
+                    is_positive=False,
+                    tag=withdrawal.status.upper(),
+                    created_at=withdrawal.updated_at or withdrawal.created_at,
+                )
+            )
+
+    signal_entries_result = await db.execute(
+        select(UserSignalEntry, Signal.asset)
+        .join(Signal, Signal.id == UserSignalEntry.signal_id)
+        .where(UserSignalEntry.user_id == current_user.id)
+        .order_by(UserSignalEntry.started_at.desc())
+        .limit(fetch_limit)
+    )
+    for entry, asset in signal_entries_result.all():
+        label = (asset or "Signal").upper()
+        activities.append(
+            HomeRecentActivityResponse(
+                id=f"signal:{entry.id}:activated",
+                type="signal_activated",
+                title=f"Signal Activated: {label}",
+                subtitle=(
+                    f"Target +{entry.profit_percent:.2f}% before expiry"
+                ),
+                amount=entry.participation_amount,
+                is_positive=True,
+                tag="SIGNAL",
+                created_at=entry.started_at,
+            )
+        )
+
+    referred_user = aliased(User)
+    referrals_result = await db.execute(
+        select(Referral, referred_user.email)
+        .join(referred_user, referred_user.id == Referral.referred_user_id)
+        .where(Referral.referrer_id == current_user.id)
+        .order_by(Referral.created_at.desc())
+        .limit(fetch_limit)
+    )
+    for referral, referred_email in referrals_result.all():
+        status = (referral.status or "pending").lower()
+        referred_label = referred_email or f"User #{referral.referred_user_id}"
+
+        if status == "rewarded":
+            title = f"Referral Rewarded: {referred_label}"
+            subtitle = "Referral bonus has been credited"
+            amount = referral.bonus_amount
+            is_positive = True
+            tag = "REWARD"
+            activity_type = "referral_rewarded"
+        elif status == "qualified":
+            title = f"Referral Qualified: {referred_label}"
+            subtitle = "Deposit requirement completed"
+            amount = referral.deposit_amount
+            is_positive = True
+            tag = "QUALIFIED"
+            activity_type = "referral_qualified"
+        else:
+            title = f"Referral Joined: {referred_label}"
+            subtitle = "Awaiting qualifying deposit"
+            amount = None
+            is_positive = None
+            tag = "REFERRAL"
+            activity_type = "referral_joined"
+
+        activities.append(
+            HomeRecentActivityResponse(
+                id=f"referral:{referral.id}:{status}",
+                type=activity_type,
+                title=title,
+                subtitle=subtitle,
+                amount=amount,
+                is_positive=is_positive,
+                tag=tag,
+                created_at=referral.created_at,
+            )
+        )
+
+    activities.sort(key=lambda item: item.created_at, reverse=True)
+    return activities[:limit]
+
+
 @dashboard_router.get("", response_model=DashboardResponse)
 async def get_dashboard(
     current_user: User = Depends(get_current_user),
@@ -85,53 +336,40 @@ async def get_dashboard(
     - Total referrals
     - Active announcements
     """
-    # Active signals for user
-    active_signals_result = await db.execute(
-        select(func.count(UserSignalEntry.id)).where(
-            UserSignalEntry.user_id == current_user.id,
-            UserSignalEntry.status == "active",
-        )
-    )
-    active_signals = active_signals_result.scalar()
-
-    # Total profit
-    total_profit_result = await db.execute(
-        select(func.coalesce(func.sum(UserSignalEntry.profit_amount), 0)).where(
-            UserSignalEntry.user_id == current_user.id,
-            UserSignalEntry.status == "completed",
-        )
-    )
-    total_profit = total_profit_result.scalar()
-
-    # Total referrals
-    referral_count_result = await db.execute(
-        select(func.count(Referral.id)).where(
-            Referral.referrer_id == current_user.id
-        )
-    )
-    total_referrals = referral_count_result.scalar()
-
-    # Active announcements
-    now = datetime.now(timezone.utc)
-    announcements_result = await db.execute(
-        select(Announcement).where(
-            Announcement.is_active == True,  # noqa: E712
-            (Announcement.start_date == None) | (Announcement.start_date <= now),  # noqa: E711
-            (Announcement.end_date == None) | (Announcement.end_date >= now),  # noqa: E711
-        )
-    )
-    announcements = announcements_result.scalars().all()
-
-    announcement_list = [
-        {"id": a.id, "title": a.title, "message": a.message}
-        for a in announcements
-    ]
+    summary = await _build_dashboard_summary(current_user, db)
 
     return DashboardResponse(
-        balance=current_user.wallet_balance,
-        active_signals=active_signals,
-        total_profit=total_profit or Decimal("0"),
-        vip_level=current_user.vip_level,
-        total_referrals=total_referrals,
-        announcements=announcement_list,
+        balance=summary["balance"],
+        active_signals=summary["active_signals"],
+        total_profit=summary["total_profit"],
+        vip_level=summary["vip_level"],
+        total_referrals=summary["total_referrals"],
+        announcements=summary["announcements"],
+    )
+
+
+@dashboard_router.get("/home", response_model=HomeDashboardResponse)
+async def get_home_dashboard(
+    activity_limit: int = Query(5, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get home dashboard payload including summary metrics and recent activity feed.
+
+    Recent activity includes deposit/withdraw requests and outcomes,
+    signal activations, and referral lifecycle events.
+    """
+    summary = await _build_dashboard_summary(current_user, db)
+    recent_activities = await _build_recent_activities(current_user, db, activity_limit)
+
+    return HomeDashboardResponse(
+        balance=summary["balance"],
+        today_profit=summary["today_profit"],
+        total_profit=summary["total_profit"],
+        active_signals=summary["active_signals"],
+        vip_level=summary["vip_level"],
+        total_referrals=summary["total_referrals"],
+        announcements=summary["announcements"],
+        recent_activities=recent_activities,
     )

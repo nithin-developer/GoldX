@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query
+from typing import Annotated
+from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -43,7 +44,7 @@ async def list_users(
 
 @router.get("/{user_id}", response_model=UserListResponse)
 async def get_user(
-    user_id: int,
+    user_id: Annotated[int, Path(ge=1000000, le=9999999)],
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -59,7 +60,7 @@ async def get_user(
 
 @router.put("/{user_id}", response_model=UserListResponse)
 async def update_user(
-    user_id: int,
+    user_id: Annotated[int, Path(ge=1000000, le=9999999)],
     data: AdminUserUpdate,
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),

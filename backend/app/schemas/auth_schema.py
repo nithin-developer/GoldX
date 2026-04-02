@@ -7,7 +7,12 @@ class RegisterRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
     full_name: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=50)
-    invite_code: str = Field(..., min_length=1, max_length=50)
+    invite_code: str = Field(
+        ...,
+        min_length=8,
+        max_length=8,
+        pattern=r"^[A-Za-z0-9]{8}$",
+    )
 
 
 class LoginRequest(BaseModel):

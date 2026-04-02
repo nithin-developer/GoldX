@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -27,7 +27,7 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     - **password**: Minimum 8 characters
     - **full_name**: Optional display name
     - **phone**: Optional phone number
-    - **invite_code**: Required referral invite code
+    - **invite_code**: Required 8-character referral invite code
     """
     user = await auth_service.register_user(data, db)
 
@@ -42,7 +42,10 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/validate-invite/{invite_code}", response_model=MessageResponse)
-async def validate_invite(invite_code: str, db: AsyncSession = Depends(get_db)):
+async def validate_invite(
+    invite_code: str = Path(..., min_length=8, max_length=8, pattern=r"^[A-Za-z0-9]{8}$"),
+    db: AsyncSession = Depends(get_db),
+):
     """Validate whether an invite code can be used for registration."""
     await auth_service.validate_invite_code(invite_code, db)
     return MessageResponse(message="Invite code is valid")

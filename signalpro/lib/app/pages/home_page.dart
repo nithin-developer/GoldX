@@ -1,9 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:signalpro/app/models/home_dashboard.dart';
+import 'package:signalpro/app/services/api_exception.dart';
+import 'package:signalpro/app/services/app_data_api.dart';
+import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/skeleton_box.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -22,24 +29,345 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  bool _loading = true;
-  Timer? _timer;
+  static const List<_MarketCoin> _coins = [
+    _MarketCoin(
+      symbol: 'BTC',
+      pair: 'BTCUSDT',
+      label: 'BTC / USDT',
+      logoAsset: 'coins/btc.png',
+    ),
+    _MarketCoin(
+      symbol: 'ETH',
+      pair: 'ETHUSDT',
+      label: 'ETH / USDT',
+      logoAsset: 'coins/eth.png',
+    ),
+    _MarketCoin(
+      symbol: 'SOL',
+      pair: 'SOLUSDT',
+      label: 'SOL / USDT',
+      logoAsset: 'coins/sol.png',
+    ),
+    _MarketCoin(
+      symbol: 'AVAX',
+      pair: 'AVAXUSDT',
+      label: 'AVAX / USDT',
+      logoAsset: 'coins/avax.png',
+    ),
+  ];
+
+  final NumberFormat _priceFormat = NumberFormat('#,##0.00');
+
+  AppDataApi? _api;
+  Future<HomeDashboardData>? _future;
+
+  WebSocketChannel? _tickerChannel;
+  StreamSubscription<dynamic>? _tickerSubscription;
+  Timer? _reconnectTimer;
+
+  final Map<String, double> _latestPrices = {};
+  final Map<String, double> _dailyChangePercent = {};
+
+  bool _isDisposed = false;
+  bool _isActiveInTree = true;
+  String? _streamError;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(milliseconds: 1200), () {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    });
+    _connectTickerStream();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _api ??= AppDataApi(dio: AuthScope.of(context).apiClient.dio);
+    _future ??= _api!.getHomeDashboard(activityLimit: 5);
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _isDisposed = true;
+    _reconnectTimer?.cancel();
+    _tickerSubscription?.cancel();
+    _tickerChannel?.sink.close();
     super.dispose();
   }
+
+  @override
+  void deactivate() {
+    _isActiveInTree = false;
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _isActiveInTree = true;
+  }
+
+  bool get _canMutateState => mounted && !_isDisposed && _isActiveInTree;
+
+  Future<void> _refresh() async {
+    final api = _api;
+    if (api == null) {
+      return;
+    }
+
+    setState(() {
+      _future = api.getHomeDashboard(forceRefresh: true, activityLimit: 5);
+    });
+
+    final pending = _future;
+    if (pending != null) {
+      await pending;
+    }
+  }
+
+  void _connectTickerStream() {
+    if (_isDisposed) {
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+    _tickerSubscription?.cancel();
+    _tickerChannel?.sink.close();
+
+    final streams = _coins
+        .map((coin) => '${coin.pair.toLowerCase()}@kline_1d')
+        .join('/');
+
+    _tickerChannel = WebSocketChannel.connect(
+      Uri.parse('wss://stream.binance.com:9443/stream?streams=$streams'),
+    );
+
+    _tickerSubscription = _tickerChannel!.stream.listen(
+      (message) {
+        final parsed = jsonDecode(message as String);
+        final data = parsed['data'];
+
+        if (data is! Map<String, dynamic>) {
+          return;
+        }
+
+        final kline = data['k'];
+        if (kline is! Map<String, dynamic>) {
+          return;
+        }
+
+        final pair = kline['s']?.toString();
+        final openPrice = double.tryParse(kline['o'].toString());
+        final closePrice = double.tryParse(kline['c'].toString());
+
+        if (pair == null ||
+            openPrice == null ||
+            openPrice <= 0 ||
+            closePrice == null ||
+            !_canMutateState) {
+          return;
+        }
+
+        final dayPercent = ((closePrice - openPrice) / openPrice) * 100;
+
+        setState(() {
+          _latestPrices[pair] = closePrice;
+          _dailyChangePercent[pair] = dayPercent;
+          _streamError = null;
+        });
+      },
+      onError: (_) {
+        if (!_canMutateState) {
+          return;
+        }
+
+        setState(() {
+          _streamError = 'Live market feed disconnected. Reconnecting...';
+        });
+
+        _scheduleReconnect();
+      },
+      onDone: () {
+        if (!_canMutateState) {
+          return;
+        }
+
+        setState(() {
+          _streamError = 'Live market feed disconnected. Reconnecting...';
+        });
+
+        _scheduleReconnect();
+      },
+      cancelOnError: true,
+    );
+  }
+
+  void _scheduleReconnect() {
+    if (_isDisposed) {
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 2), () {
+      if (!_canMutateState) {
+        return;
+      }
+      _connectTickerStream();
+    });
+  }
+
+  String _formatPrice(double? price) {
+    if (price == null) {
+      return '\$ --';
+    }
+    return '\$${_priceFormat.format(price)}';
+  }
+
+  String _buildAlertText(List<HomeAnnouncement> announcements) {
+    final active = announcements
+        .where((item) => item.message.trim().isNotEmpty)
+        .take(3)
+        .map((item) => item.message.trim())
+        .toList();
+
+    if (active.isEmpty) {
+      return 'Market Alert: BTC above \$72k | New ETH signals live | Refer and earn rewards';
+    }
+
+    return active.join('  |  ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<HomeDashboardData>(
+      future: _future,
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? _api?.getCachedHomeDashboard();
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            data == null) {
+          return _HomeLoadingView(
+            onDeposit: widget.onDeposit,
+            onWithdraw: widget.onWithdraw,
+            onSupport: widget.onSupport,
+          );
+        }
+
+        if (snapshot.hasError && data == null) {
+          final message = snapshot.error is ApiException
+              ? (snapshot.error as ApiException).message
+              : 'Unable to load dashboard data.';
+          return _HomeErrorState(message: message, onRetry: _refresh);
+        }
+
+        if (data == null) {
+          return _HomeErrorState(
+            message: 'Dashboard data is unavailable.',
+            onRetry: _refresh,
+          );
+        }
+
+        final activities = data.recentActivities.take(5).toList();
+
+        return RefreshIndicator(
+          onRefresh: _refresh,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.background,
+                  AppColors.accent,
+                  AppColors.backgroundSecondary,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: ListView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+              children: [
+                _MarketAlertBanner(text: _buildAlertText(data.announcements)),
+                const SizedBox(height: 16),
+                _BalanceHeroCard(data: data),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _QuickAction(
+                        icon: Icons.south_west_rounded,
+                        label: 'Deposit',
+                        iconColor: AppColors.secondary,
+                        onTap: widget.onDeposit,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _QuickAction(
+                        icon: Icons.north_east_rounded,
+                        label: 'Withdraw',
+                        iconColor: AppColors.highlight,
+                        onTap: widget.onWithdraw,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _QuickAction(
+                        icon: Icons.support_agent_rounded,
+                        label: 'Support',
+                        iconColor: AppColors.secondary,
+                        onTap: widget.onSupport,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const _SectionTitle(
+                  title: 'Market Snapshot',
+                  actionText: 'LIVE',
+                ),
+                const SizedBox(height: 10),
+                _SnapshotScroller(
+                  coins: _coins,
+                  latestPrices: _latestPrices,
+                  dailyChangePercent: _dailyChangePercent,
+                  formatPrice: _formatPrice,
+                ),
+                if (_streamError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _streamError!,
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                const _SectionTitle(title: 'Recent Activity'),
+                const SizedBox(height: 10),
+                _RecentActivityCard(activities: activities),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HomeLoadingView extends StatelessWidget {
+  const _HomeLoadingView({
+    required this.onDeposit,
+    required this.onWithdraw,
+    required this.onSupport,
+  });
+
+  final VoidCallback onDeposit;
+  final VoidCallback onWithdraw;
+  final VoidCallback onSupport;
 
   @override
   Widget build(BuildContext context) {
@@ -61,9 +389,9 @@ class _HomePageState extends State<HomePage> {
         ),
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
         children: [
-          const _MarketAlertBanner(),
+          const SkeletonBox(height: 46, radius: 14),
           const SizedBox(height: 16),
-          const _BalanceHeroCard(),
+          const SkeletonBox(height: 168, radius: 24),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -72,7 +400,7 @@ class _HomePageState extends State<HomePage> {
                   icon: Icons.south_west_rounded,
                   label: 'Deposit',
                   iconColor: AppColors.secondary,
-                  onTap: widget.onDeposit,
+                  onTap: onDeposit,
                 ),
               ),
               const SizedBox(width: 10),
@@ -81,7 +409,7 @@ class _HomePageState extends State<HomePage> {
                   icon: Icons.north_east_rounded,
                   label: 'Withdraw',
                   iconColor: AppColors.highlight,
-                  onTap: widget.onWithdraw,
+                  onTap: onWithdraw,
                 ),
               ),
               const SizedBox(width: 10),
@@ -90,37 +418,73 @@ class _HomePageState extends State<HomePage> {
                   icon: Icons.support_agent_rounded,
                   label: 'Support',
                   iconColor: AppColors.secondary,
-                  onTap: widget.onSupport,
+                  onTap: onSupport,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          const _SectionTitle(
-            title: 'Market Snapshot',
-            actionText: 'VIEW MARKET',
-          ),
+          const _SectionTitle(title: 'Market Snapshot', actionText: 'LIVE'),
           const SizedBox(height: 10),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: _loading
-                ? const _SnapshotSkeletons(key: ValueKey<String>('skeleton'))
-                : const _SnapshotScroller(key: ValueKey<String>('snapshot')),
-          ),
+          const _SnapshotSkeletons(),
           const SizedBox(height: 20),
           const _SectionTitle(title: 'Recent Activity'),
           const SizedBox(height: 10),
-          const _RecentActivityCard(),
+          const SkeletonBox(height: 210, radius: 22),
         ],
       ),
     );
   }
 }
 
+class _HomeErrorState extends StatelessWidget {
+  const _HomeErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: GlassCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.danger,
+                size: 34,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Unable to load home dashboard',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => onRetry(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MarketAlertBanner extends StatelessWidget {
-  const _MarketAlertBanner();
+  const _MarketAlertBanner({required this.text});
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -131,15 +495,18 @@ class _MarketAlertBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.campaign_rounded, size: 18, color: AppColors.secondary),
-          SizedBox(width: 8),
+          const Icon(
+            Icons.campaign_rounded,
+            size: 18,
+            color: AppColors.secondary,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: _MarqueeText(
-              text:
-                  'Market Alert: BTC Surges above \$72k | New Signals for ETH/USDT live now | Refer a friend and earn 20%',
-              style: TextStyle(
+              text: text,
+              style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
@@ -217,15 +584,20 @@ class _MarqueeTextState extends State<_MarqueeText>
 }
 
 class _BalanceHeroCard extends StatelessWidget {
-  const _BalanceHeroCard();
+  const _BalanceHeroCard({required this.data});
+
+  final HomeDashboardData data;
 
   @override
   Widget build(BuildContext context) {
+    final balance = _MoneyFormatters.currency(data.balance);
+    final todayProfit = _MoneyFormatters.signed(data.todayProfit);
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
-          colors: [Color(0xFFD4AF37), Color(0xFFF4F1EE)],
+          colors: [Color(0xFFD4AF37), Color(0xFFE6C65C), Color(0xFFF4F1EE)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -237,115 +609,96 @@ class _BalanceHeroCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          // Positioned(
-          //   top: -56,
-          //   right: -40,
-          //   child: Container(
-          //     width: 170,
-          //     height: 170,
-          //     decoration: BoxDecoration(
-          //       color: Colors.white.withValues(alpha: 0.22),
-          //       shape: BoxShape.circle,
-          //     ),
-          //   ),
-          // ),
-          // Positioned(
-          //   bottom: -64,
-          //   left: -46,
-          //   child: Container(
-          //     width: 190,
-          //     height: 190,
-          //     decoration: BoxDecoration(
-          //       color: AppColors.primaryDark.withValues(alpha: 0.25),
-          //       shape: BoxShape.circle,
-          //     ),
-          //   ),
-          // ),
-          const Padding(
-            padding: EdgeInsets.all(18),
-            child: Column(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'TOTAL BALANCE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontFamily: 'Inter',
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.1,
-                              color: AppColors.secondary,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            '\$42,892.50',
-                            style: TextStyle(
-                              fontSize: 38,
-                              fontWeight: FontWeight.w900,
-                              fontFamily: 'Inter',
-                              color: AppColors.onSurface,
-                              height: 1,
-                            ),
-                          ),
-                        ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TOTAL BALANCE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontFamily: 'Inter',
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                          color: AppColors.secondary,
+                        ),
                       ),
-                    ),
-                    _PerformanceChip(),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        balance,
+                        style: const TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Inter',
+                          color: AppColors.onSurface,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'TODAY`S PROFIT',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1,
-                              color: AppColors.secondary,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            '+\$1,240.00',
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                              color: Color.fromARGB(255, 255, 255, 255),
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _AssetCircleRow(),
-                  ],
+                _PerformanceChip(
+                  activeSignals: data.activeSignals,
+                  totalReferrals: data.totalReferrals,
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TODAY\'S PROFIT',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                          color: AppColors.secondary,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        todayProfit,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: Color.fromARGB(255, 255, 255, 255),
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _AssetCircleRow(),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _PerformanceChip extends StatelessWidget {
-  const _PerformanceChip();
+  const _PerformanceChip({
+    required this.activeSignals,
+    required this.totalReferrals,
+  });
+
+  final int activeSignals;
+  final int totalReferrals;
 
   @override
   Widget build(BuildContext context) {
@@ -356,24 +709,34 @@ class _PerformanceChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
       ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Icon(Icons.trending_up_rounded, size: 14, color: AppColors.secondary),
-          SizedBox(width: 4),
-          Text(
-            '+12.4%',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: AppColors.secondary,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.verified_user,
+                size: 14,
+                color: AppColors.secondary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'VIP $activeSignals Level',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.secondary,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
 
 class _AssetCircleRow extends StatelessWidget {
   const _AssetCircleRow();
@@ -412,6 +775,7 @@ class _AssetCircle extends StatelessWidget {
     );
   }
 }
+
 
 class _QuickAction extends StatelessWidget {
   const _QuickAction({
@@ -474,7 +838,6 @@ class _SectionTitle extends StatelessWidget {
             title,
             style: const TextStyle(
               fontSize: 21,
-
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
               color: AppColors.onSurface,
@@ -497,7 +860,7 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _SnapshotSkeletons extends StatelessWidget {
-  const _SnapshotSkeletons({super.key});
+  const _SnapshotSkeletons();
 
   @override
   Widget build(BuildContext context) {
@@ -512,50 +875,47 @@ class _SnapshotSkeletons extends StatelessWidget {
           );
         },
         separatorBuilder: (context, index) => const SizedBox(width: 10),
-        itemCount: 3,
+        itemCount: 4,
       ),
     );
   }
 }
 
 class _SnapshotScroller extends StatelessWidget {
-  const _SnapshotScroller({super.key});
+  const _SnapshotScroller({
+    required this.coins,
+    required this.latestPrices,
+    required this.dailyChangePercent,
+    required this.formatPrice,
+  });
+
+  final List<_MarketCoin> coins;
+  final Map<String, double> latestPrices;
+  final Map<String, double> dailyChangePercent;
+  final String Function(double? price) formatPrice;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       height: 132,
-      child: ListView(
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        children: const [
-          _SnapshotAssetCard(
-            asset: 'BTC/USDT',
-            price: '\$72,431.2',
-            gain: '+2.45%',
-            icon: Icons.currency_bitcoin_rounded,
-            iconColor: Color(0xFFF7931A),
-            positive: true,
-          ),
-          SizedBox(width: 10),
-          _SnapshotAssetCard(
-            asset: 'ETH/USDT',
-            price: '\$3,842.15',
-            gain: '+1.12%',
-            icon: Icons.eco_rounded,
-            iconColor: Color(0xFF627EEA),
-            positive: true,
-          ),
-          SizedBox(width: 10),
-          _SnapshotAssetCard(
-            asset: 'SOL/USDT',
-            price: '\$145.02',
-            gain: '-0.84%',
-            icon: Icons.show_chart_rounded,
-            iconColor: AppColors.highlight,
-            positive: false,
-          ),
-        ],
+        itemCount: coins.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final coin = coins[index];
+          final price = latestPrices[coin.pair];
+          final change = dailyChangePercent[coin.pair];
+
+          return _SnapshotAssetCard(
+            asset: coin.label,
+            logoAsset: coin.logoAsset,
+            price: formatPrice(price),
+            gain: _MoneyFormatters.percent(change),
+            positive: change == null ? null : change >= 0,
+          );
+        },
       ),
     );
   }
@@ -564,123 +924,148 @@ class _SnapshotScroller extends StatelessWidget {
 class _SnapshotAssetCard extends StatelessWidget {
   const _SnapshotAssetCard({
     required this.asset,
+    required this.logoAsset,
     required this.price,
     required this.gain,
-    required this.icon,
-    required this.iconColor,
     required this.positive,
   });
 
   final String asset;
+  final String logoAsset;
   final String price;
   final String gain;
-  final IconData icon;
-  final Color iconColor;
-  final bool positive;
+  final bool? positive;
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      borderRadius: 16,
-      borderColor: AppColors.outlineVariant,
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceSoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 16, color: iconColor),
-              ),
-              const Spacer(),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: positive ? AppColors.primary : AppColors.highlight,
+    return SizedBox(
+      width: 156,
+      child: GlassCard(
+        borderRadius: 16,
+        borderColor: AppColors.outlineVariant,
+        padding: const EdgeInsets.all(18),
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: AppColors.success,
                   shape: BoxShape.circle,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            asset,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: AppColors.onSurfaceVariant,
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            price,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: AppColors.onSurface,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _CoinAvatar(logoAsset: logoAsset, size: 30),
+                const SizedBox(height: 10),
+                Text(
+                  asset,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  price,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                Text(
+                  gain,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: positive == true
+                        ? AppColors.success
+                        : AppColors.danger,
+                  ),
+                ),
+              ],
             ),
-          ),
-          Text(
-            gain,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: positive ? AppColors.secondary : AppColors.highlight,
-            ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoinAvatar extends StatelessWidget {
+  const _CoinAvatar({required this.logoAsset, required this.size});
+
+  final String logoAsset;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(size / 2),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.asset(
+        logoAsset,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Icon(
+            Icons.token_rounded,
+            size: size * 0.55,
+            color: AppColors.textMuted,
+          );
+        },
       ),
     );
   }
 }
 
 class _RecentActivityCard extends StatelessWidget {
-  const _RecentActivityCard();
+  const _RecentActivityCard({required this.activities});
+
+  final List<HomeRecentActivity> activities;
 
   @override
   Widget build(BuildContext context) {
+    if (activities.isEmpty) {
+      return GlassCard(
+        borderRadius: 22,
+        borderColor: AppColors.outlineVariant,
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'No recent activity yet. Your latest deposits, withdrawals, signals, and referrals will appear here.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
     return GlassCard(
       borderRadius: 22,
       borderColor: AppColors.outlineVariant,
       padding: EdgeInsets.zero,
       child: Column(
-        children: const [
-          _ActivityRow(
-            title: 'Signal Executed: BTC/USDT',
-            time: 'Today, 02:45 PM',
-            value: '+\$420.00',
-            tag: 'PROFIT',
-            icon: Icons.trending_up_rounded,
-            iconColor: AppColors.secondary,
-            positive: true,
-          ),
-          Divider(height: 1, color: AppColors.outlineVariant),
-          _ActivityRow(
-            title: 'Deposit Confirmed',
-            time: 'Yesterday, 11:20 AM',
-            value: '+\$5,000.00',
-            tag: 'USDT',
-            icon: Icons.account_balance_wallet_rounded,
-            iconColor: AppColors.highlight,
-            positive: true,
-          ),
-          Divider(height: 1, color: AppColors.outlineVariant),
-          _ActivityRow(
-            title: 'Referral Bonus Received',
-            time: '22 Oct, 09:15 AM',
-            value: '+\$15.00',
-            tag: 'COMMISSION',
-            icon: Icons.recommend_rounded,
-            iconColor: AppColors.secondary,
-            positive: true,
-          ),
+        children: [
+          for (var i = 0; i < activities.length; i++) ...[
+            _ActivityRow(activity: activities[i]),
+            if (i != activities.length - 1)
+              const Divider(height: 1, color: AppColors.outlineVariant),
+          ],
         ],
       ),
     );
@@ -688,26 +1073,23 @@ class _RecentActivityCard extends StatelessWidget {
 }
 
 class _ActivityRow extends StatelessWidget {
-  const _ActivityRow({
-    required this.title,
-    required this.time,
-    required this.value,
-    required this.tag,
-    required this.icon,
-    required this.iconColor,
-    required this.positive,
-  });
+  const _ActivityRow({required this.activity});
 
-  final String title;
-  final String time;
-  final String value;
-  final String tag;
-  final IconData icon;
-  final Color iconColor;
-  final bool positive;
+  final HomeRecentActivity activity;
 
   @override
   Widget build(BuildContext context) {
+    final visual = _ActivityVisual.forType(activity.type);
+    final valueText = _MoneyFormatters.activityAmount(
+      activity.amount,
+      activity.isPositive,
+    );
+    final valueColor = activity.isPositive == true
+        ? AppColors.secondary
+        : (activity.isPositive == false
+              ? AppColors.danger
+              : AppColors.onSurfaceVariant);
+
     return Padding(
       padding: const EdgeInsets.all(14),
       child: Row(
@@ -716,10 +1098,10 @@ class _ActivityRow extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
+              color: visual.color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, size: 22, color: iconColor),
+            child: Icon(visual.icon, size: 22, color: visual.color),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -727,7 +1109,7 @@ class _ActivityRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  activity.title,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -736,7 +1118,9 @@ class _ActivityRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  time,
+                  activity.subtitle?.trim().isNotEmpty == true
+                      ? activity.subtitle!
+                      : _MoneyFormatters.activityTime(activity.createdAt),
                   style: const TextStyle(
                     color: AppColors.onSurfaceVariant,
                     fontSize: 11,
@@ -751,16 +1135,16 @@ class _ActivityRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                value,
+                valueText,
                 style: TextStyle(
-                  color: positive ? AppColors.secondary : AppColors.danger,
+                  color: valueColor,
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                tag,
+                activity.tag,
                 style: const TextStyle(
                   color: AppColors.onSurfaceVariant,
                   fontSize: 10,
@@ -773,5 +1157,133 @@ class _ActivityRow extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ActivityVisual {
+  const _ActivityVisual({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  static _ActivityVisual forType(String type) {
+    switch (type) {
+      case 'deposit_requested':
+        return const _ActivityVisual(
+          icon: Icons.account_balance_wallet_rounded,
+          color: AppColors.highlight,
+        );
+      case 'deposit_approved':
+        return const _ActivityVisual(
+          icon: Icons.check_circle_rounded,
+          color: AppColors.secondary,
+        );
+      case 'deposit_rejected':
+        return const _ActivityVisual(
+          icon: Icons.cancel_rounded,
+          color: AppColors.danger,
+        );
+      case 'withdrawal_requested':
+        return const _ActivityVisual(
+          icon: Icons.outbox_rounded,
+          color: AppColors.highlight,
+        );
+      case 'withdrawal_approved':
+        return const _ActivityVisual(
+          icon: Icons.task_alt_rounded,
+          color: AppColors.danger,
+        );
+      case 'withdrawal_rejected':
+        return const _ActivityVisual(
+          icon: Icons.block_rounded,
+          color: AppColors.danger,
+        );
+      case 'signal_activated':
+        return const _ActivityVisual(
+          icon: Icons.bolt_rounded,
+          color: AppColors.secondary,
+        );
+      case 'referral_rewarded':
+        return const _ActivityVisual(
+          icon: Icons.workspace_premium_rounded,
+          color: AppColors.secondary,
+        );
+      case 'referral_qualified':
+        return const _ActivityVisual(
+          icon: Icons.verified_rounded,
+          color: AppColors.secondary,
+        );
+      default:
+        return const _ActivityVisual(
+          icon: Icons.groups_rounded,
+          color: AppColors.highlight,
+        );
+    }
+  }
+}
+
+class _MarketCoin {
+  const _MarketCoin({
+    required this.symbol,
+    required this.pair,
+    required this.label,
+    required this.logoAsset,
+  });
+
+  final String symbol;
+  final String pair;
+  final String label;
+  final String logoAsset;
+}
+
+class _MoneyFormatters {
+  static final NumberFormat _amountFormat = NumberFormat('#,##0.00');
+  static final DateFormat _timeFormat = DateFormat('hh:mm a');
+  static final DateFormat _dateTimeFormat = DateFormat('dd MMM, hh:mm a');
+
+  static String currency(double value) => '\$${_amountFormat.format(value)}';
+
+  static String signed(double value) {
+    final sign = value >= 0 ? '+' : '-';
+    return '$sign\$${_amountFormat.format(value.abs())}';
+  }
+
+  static String percent(double? value) {
+    if (value == null) {
+      return '--';
+    }
+
+    final sign = value >= 0 ? '+' : '';
+    return '$sign${value.toStringAsFixed(2)}%';
+  }
+
+  static String activityAmount(double? amount, bool? isPositive) {
+    if (amount == null) {
+      return '--';
+    }
+
+    final normalized = '\$${_amountFormat.format(amount.abs())}';
+    if (isPositive == true) {
+      return '+$normalized';
+    }
+    if (isPositive == false) {
+      return '-$normalized';
+    }
+    return normalized;
+  }
+
+  static String activityTime(DateTime createdAt) {
+    final local = createdAt.toLocal();
+    final now = DateTime.now();
+    final isToday =
+        local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+
+    if (isToday) {
+      return 'Today, ${_timeFormat.format(local)}';
+    }
+
+    return _dateTimeFormat.format(local);
   }
 }
