@@ -44,6 +44,7 @@ class DepositResponse(BaseModel):
     payment_proof_url: Optional[str] = None
     admin_note: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 class WithdrawalResponse(BaseModel):
@@ -54,6 +55,7 @@ class WithdrawalResponse(BaseModel):
     wallet_address: Optional[str] = None
     admin_note: Optional[str] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 class DepositSettingsResponse(BaseModel):

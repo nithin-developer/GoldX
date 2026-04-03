@@ -236,17 +236,73 @@ async def create_deposit(
 
 
 async def get_user_deposits(
-    user: User, db: AsyncSession, skip: int = 0, limit: int = 50
+    user: User,
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 50,
+    status_filter: str | None = None,
 ) -> list[Deposit]:
     """Get paginated deposit history."""
-    result = await db.execute(
-        select(Deposit)
-        .where(Deposit.user_id == user.id)
-        .order_by(Deposit.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
+    query = select(Deposit).where(Deposit.user_id == user.id)
+    if status_filter:
+        query = query.where(Deposit.status == status_filter.lower())
+
+    query = query.order_by(Deposit.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
+
+
+async def get_user_deposit_by_public_id(
+    user: User,
+    deposit_public_id: str,
+    db: AsyncSession,
+) -> Deposit:
+    """Get a single deposit owned by the current user."""
+    result = await db.execute(
+        select(Deposit).where(
+            Deposit.user_id == user.id,
+            Deposit.public_id == deposit_public_id,
+        )
+    )
+    deposit = result.scalar_one_or_none()
+    if not deposit:
+        raise HTTPException(status_code=404, detail="Deposit not found")
+    return deposit
+
+
+async def get_user_withdrawals(
+    user: User,
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 50,
+    status_filter: str | None = None,
+) -> list[Withdrawal]:
+    """Get paginated withdrawal history."""
+    query = select(Withdrawal).where(Withdrawal.user_id == user.id)
+    if status_filter:
+        query = query.where(Withdrawal.status == status_filter.lower())
+
+    query = query.order_by(Withdrawal.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_user_withdrawal_by_public_id(
+    user: User,
+    withdrawal_public_id: str,
+    db: AsyncSession,
+) -> Withdrawal:
+    """Get a single withdrawal owned by the current user."""
+    result = await db.execute(
+        select(Withdrawal).where(
+            Withdrawal.user_id == user.id,
+            Withdrawal.public_id == withdrawal_public_id,
+        )
+    )
+    withdrawal = result.scalar_one_or_none()
+    if not withdrawal:
+        raise HTTPException(status_code=404, detail="Withdrawal not found")
+    return withdrawal
 
 
 async def create_withdrawal(

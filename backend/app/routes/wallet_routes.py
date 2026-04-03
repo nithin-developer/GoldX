@@ -34,6 +34,7 @@ def _build_deposit_response(deposit, base_url: str | None = None) -> DepositResp
         ),
         admin_note=deposit.admin_note,
         created_at=deposit.created_at,
+        updated_at=deposit.updated_at,
     )
 
 
@@ -46,6 +47,7 @@ def _build_withdrawal_response(withdrawal) -> WithdrawalResponse:
         wallet_address=withdrawal.wallet_address,
         admin_note=withdrawal.admin_note,
         created_at=withdrawal.created_at,
+        updated_at=withdrawal.updated_at,
     )
 
 
@@ -112,13 +114,41 @@ async def get_deposits(
     request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    status_filter: str | None = Query(
+        None,
+        alias="status",
+        pattern="^(pending|approved|rejected)$",
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get deposit history for the current user."""
-    deposits = await wallet_service.get_user_deposits(current_user, db, skip, limit)
+    deposits = await wallet_service.get_user_deposits(
+        current_user,
+        db,
+        skip,
+        limit,
+        status_filter=status_filter,
+    )
     base_url = str(request.base_url).rstrip("/")
     return [_build_deposit_response(d, base_url) for d in deposits]
+
+
+@router.get("/deposits/{deposit_id}", response_model=DepositResponse)
+async def get_deposit_details(
+    request: Request,
+    deposit_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single deposit record owned by the current user."""
+    deposit = await wallet_service.get_user_deposit_by_public_id(
+        current_user,
+        deposit_id,
+        db,
+    )
+    base_url = str(request.base_url).rstrip("/")
+    return _build_deposit_response(deposit, base_url)
 
 
 @router.get("/deposit-settings", response_model=DepositSettingsResponse)
@@ -179,6 +209,44 @@ async def create_withdrawal(
     """
     withdrawal = await wallet_service.create_withdrawal(
         current_user, data.amount, data.withdrawal_password, data.wallet_address, db
+    )
+    return _build_withdrawal_response(withdrawal)
+
+
+@router.get("/withdrawals", response_model=list[WithdrawalResponse])
+async def get_withdrawals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    status_filter: str | None = Query(
+        None,
+        alias="status",
+        pattern="^(pending|approved|rejected)$",
+    ),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get withdrawal history for the current user."""
+    withdrawals = await wallet_service.get_user_withdrawals(
+        current_user,
+        db,
+        skip,
+        limit,
+        status_filter=status_filter,
+    )
+    return [_build_withdrawal_response(w) for w in withdrawals]
+
+
+@router.get("/withdrawals/{withdrawal_id}", response_model=WithdrawalResponse)
+async def get_withdrawal_details(
+    withdrawal_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single withdrawal record owned by the current user."""
+    withdrawal = await wallet_service.get_user_withdrawal_by_public_id(
+        current_user,
+        withdrawal_id,
+        db,
     )
     return _build_withdrawal_response(withdrawal)
 

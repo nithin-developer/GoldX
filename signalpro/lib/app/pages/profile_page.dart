@@ -8,6 +8,8 @@ import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/empty_state_illustration.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/primary_button.dart';
+import 'package:signalpro/app/pages/deposit_history_page.dart';
+import 'package:signalpro/app/pages/withdrawal_history_page.dart';
 import 'package:signalpro/app/pages/withdrawal_password_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -65,12 +67,25 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  void _openDepositHistoryPage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const DepositHistoryPage()));
+  }
+
+  void _openWithdrawalHistoryPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const WithdrawalHistoryPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<UserProfile>(
       future: _future,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting && widget.user == null) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            widget.user == null) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -95,7 +110,9 @@ class _ProfilePageState extends State<ProfilePage> {
             : 'SignalPro User';
         final displayEmail = user.email;
         final displayId = user.id.toString();
-        final joinedAt = DateFormat('dd MMM yyyy').format(user.createdAt.toLocal());
+        final joinedAt = DateFormat(
+          'dd MMM yyyy',
+        ).format(user.createdAt.toLocal());
 
         return RefreshIndicator(
           onRefresh: _refresh,
@@ -113,7 +130,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 10),
                     Text(
                       displayName,
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     Text(
                       '$displayEmail - ID: $displayId',
@@ -136,21 +156,39 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 12),
               const _SectionTag('ACCOUNT'),
               const SizedBox(height: 8),
+              // _TileCard(
+              //   title: 'Invite Code',
+              //   subtitle: user.inviteCode?.isNotEmpty == true
+              //       ? user.inviteCode!
+              //       : 'Not generated yet',
+              //   icon: Icons.confirmation_number_outlined,
+              // ),
+              // const SizedBox(height: 10),
+              // _TileCard(
+              //   title: 'Wallet Balance',
+              //   subtitle: '\$${user.walletBalance.toStringAsFixed(2)}',
+              //   icon: Icons.account_balance_wallet_outlined,
+              // ),
+              // const SizedBox(height: 10),
               _TileCard(
-                title: 'Invite Code',
-                subtitle: user.inviteCode?.isNotEmpty == true ? user.inviteCode! : 'Not generated yet',
-                icon: Icons.confirmation_number_outlined,
+                title: 'Deposit History',
+                subtitle: 'Track requests, approvals, and deposit details',
+                icon: Icons.history_rounded,
+                onTap: _openDepositHistoryPage,
               ),
               const SizedBox(height: 10),
               _TileCard(
-                title: 'Wallet Balance',
-                subtitle: '\$${user.walletBalance.toStringAsFixed(2)}',
-                icon: Icons.account_balance_wallet_outlined,
+                title: 'Withdrawal History',
+                subtitle: 'Monitor payouts, status updates, and notes',
+                icon: Icons.outbox_outlined,
+                onTap: _openWithdrawalHistoryPage,
               ),
               const SizedBox(height: 10),
               _TileCard(
                 title: 'Withdrawal Password',
-                subtitle: user.hasWithdrawalPassword ? 'Configured' : 'Not configured',
+                subtitle: user.hasWithdrawalPassword
+                    ? 'Configured'
+                    : 'Not configured',
                 icon: Icons.password_rounded,
                 onTap: () => _openWithdrawalPasswordPage(user),
               ),
@@ -248,7 +286,10 @@ class _TileCard extends StatelessWidget {
               color: AppColors.backgroundSecondary,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: danger ? AppColors.danger : AppColors.primaryBright),
+            child: Icon(
+              icon,
+              color: danger ? AppColors.danger : AppColors.primaryBright,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -262,7 +303,13 @@ class _TileCard extends StatelessWidget {
                     color: danger ? AppColors.danger : AppColors.textPrimary,
                   ),
                 ),
-                Text(subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
@@ -288,11 +335,22 @@ class _ErrorState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 34),
+              const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.danger,
+                size: 34,
+              ),
               const SizedBox(height: 8),
-              const Text('Unable to load profile', style: TextStyle(fontWeight: FontWeight.w700)),
+              const Text(
+                'Unable to load profile',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
-              Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 12),
               PrimaryButton(text: 'Retry', onPressed: onRetry),
             ],
