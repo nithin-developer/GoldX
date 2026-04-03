@@ -66,6 +66,7 @@ class HomeDashboardData {
     required this.vipLevel,
     required this.totalReferrals,
     required this.announcements,
+    required this.activeSignalAlerts,
     required this.recentActivities,
   });
 
@@ -76,10 +77,12 @@ class HomeDashboardData {
   final int vipLevel;
   final int totalReferrals;
   final List<HomeAnnouncement> announcements;
+  final List<String> activeSignalAlerts;
   final List<HomeRecentActivity> recentActivities;
 
   factory HomeDashboardData.fromJson(Map<String, dynamic> json) {
     final announcementsRaw = json['announcements'];
+    final activeSignalAlertsRaw = json['active_signal_alerts'];
     final activitiesRaw = json['recent_activities'];
 
     return HomeDashboardData(
@@ -95,6 +98,13 @@ class HomeDashboardData {
                 .map(HomeAnnouncement.fromJson)
                 .toList()
           : const <HomeAnnouncement>[],
+      activeSignalAlerts: activeSignalAlertsRaw is List
+          ? activeSignalAlertsRaw
+                .whereType<String>()
+                .map((item) => item.trim())
+                .where((item) => item.isNotEmpty)
+                .toList()
+          : const <String>[],
       recentActivities: activitiesRaw is List
           ? activitiesRaw
                 .whereType<Map<String, dynamic>>()

@@ -1,6 +1,6 @@
 from decimal import Decimal
-from typing import Annotated
-from fastapi import APIRouter, Depends, Path, Query, Request
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import aliased
@@ -9,7 +9,7 @@ from app.core.dependencies import get_current_admin
 from app.models.user import User
 from app.models.wallet import Deposit, Withdrawal
 from app.models.signal import Signal
-from app.models.notification import Notification, Announcement, SupportMessage
+from app.models.notification import Notification, Announcement
 from app.models.referral import Referral
 from app.schemas.notification_schema import (
     ReportResponse,
@@ -17,8 +17,6 @@ from app.schemas.notification_schema import (
     NotificationResponse,
     CreateAnnouncementRequest,
     AnnouncementResponse,
-    SupportMessageResponse,
-    AdminSupportReplyRequest,
 )
 from app.schemas.wallet_schema import (
     DepositResponse,
@@ -59,49 +57,6 @@ def _build_withdrawal_response(withdrawal) -> WithdrawalResponse:
         admin_note=withdrawal.admin_note,
         created_at=withdrawal.created_at,
     )
-
-
-async def _build_support_chat_payload(db: AsyncSession) -> list[dict]:
-    """Build support chats in the shape used by the admin frontend."""
-    result = await db.execute(
-        select(
-            SupportMessage.user_id,
-            User.email.label("user_email"),
-            func.max(SupportMessage.created_at).label("updated_at"),
-        )
-        .join(User, User.id == SupportMessage.user_id)
-        .group_by(SupportMessage.user_id, User.email)
-        .order_by(func.max(SupportMessage.created_at).desc())
-    )
-
-    chats = []
-    for row in result.all():
-        messages_result = await db.execute(
-            select(SupportMessage)
-            .where(SupportMessage.user_id == row.user_id)
-            .order_by(SupportMessage.created_at.asc())
-        )
-        messages = messages_result.scalars().all()
-
-        chats.append(
-            {
-                "id": row.user_id,
-                "user_id": row.user_id,
-                "user_email": row.user_email,
-                "updated_at": row.updated_at,
-                "messages": [
-                    {
-                        "id": m.id,
-                        "message": m.message,
-                        "sender": "admin" if m.sender_type == "admin" else "user",
-                        "created_at": m.created_at,
-                    }
-                    for m in messages
-                ],
-            }
-        )
-
-    return chats
 
 
 # --- Reports ---
@@ -317,13 +272,23 @@ async def send_notification(
 # --- Announcements ---
 @router.get("/announcements", response_model=list[AnnouncementResponse])
 async def list_announcements(
+    active_only: bool = Query(True),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """List all announcements (admin only)."""
-    result = await db.execute(
-        select(Announcement).order_by(Announcement.created_at.desc())
-    )
+    query = select(Announcement)
+
+    if active_only:
+        now = datetime.now(timezone.utc)
+        query = query.where(
+            Announcement.is_active == True,  # noqa: E712
+            (Announcement.start_date == None) | (Announcement.start_date <= now),  # noqa: E711
+            (Announcement.end_date == None) | (Announcement.end_date >= now),  # noqa: E711
+        )
+
+    query = query.order_by(Announcement.created_at.desc())
+    result = await db.execute(query)
     announcements = result.scalars().all()
     return [AnnouncementResponse.model_validate(a) for a in announcements]
 
@@ -421,96 +386,3 @@ async def list_vip_users_admin(
     ]
 
 
-# --- Support Chat ---
-@router.get("/support", response_model=list[dict])
-async def list_support_chats_ui(
-    admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """UI-friendly support endpoint used by the current admin frontend."""
-    return await _build_support_chat_payload(db)
-
-
-@router.get("/support/chats", response_model=list[dict])
-async def list_support_chats(
-    admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """List all unique support chat users with their latest message (admin only)."""
-    # Get distinct user IDs who have support messages
-    result = await db.execute(
-        select(
-            SupportMessage.user_id,
-            func.max(SupportMessage.created_at).label("last_message_at"),
-            func.count(SupportMessage.id).label("message_count"),
-        )
-        .group_by(SupportMessage.user_id)
-        .order_by(func.max(SupportMessage.created_at).desc())
-    )
-    rows = result.all()
-
-    chats = []
-    for row in rows:
-        # Get user info
-        user_result = await db.execute(
-            select(User.email, User.full_name).where(User.id == row.user_id)
-        )
-        user_info = user_result.one_or_none()
-
-        chats.append({
-            "user_id": row.user_id,
-            "email": user_info.email if user_info else "Unknown",
-            "full_name": user_info.full_name if user_info else None,
-            "last_message_at": row.last_message_at,
-            "message_count": row.message_count,
-        })
-
-    return chats
-
-
-@router.get("/support/messages/{user_id}", response_model=list[SupportMessageResponse])
-async def get_user_support_messages(
-    user_id: Annotated[int, Path(ge=1000000, le=9999999)],
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=200),
-    admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get support messages for a specific user (admin only)."""
-    result = await db.execute(
-        select(SupportMessage)
-        .where(SupportMessage.user_id == user_id)
-        .order_by(SupportMessage.created_at.asc())
-        .offset(skip)
-        .limit(limit)
-    )
-    messages = result.scalars().all()
-    return [SupportMessageResponse.model_validate(m) for m in messages]
-
-
-@router.post("/support/reply", response_model=SupportMessageResponse, status_code=201)
-async def reply_to_support(
-    data: AdminSupportReplyRequest,
-    admin: User = Depends(get_current_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """Reply to a user's support message (admin only)."""
-    user_id = data.user_id
-    message = SupportMessage(
-        user_id=user_id,
-        sender_type="admin",
-        message=data.message,
-    )
-    db.add(message)
-
-    # Also create a notification for the user
-    notification = Notification(
-        user_id=user_id,
-        title="Support Reply",
-        message="You have a new reply from support.",
-        type="support",
-    )
-    db.add(notification)
-
-    await db.flush()
-    return SupportMessageResponse.model_validate(message)

@@ -28,6 +28,7 @@ type SettingsForm = {
   network: string;
   wallet_address: string;
   instructions: string;
+  support_url: string;
 };
 
 const initialForm: SettingsForm = {
@@ -35,6 +36,7 @@ const initialForm: SettingsForm = {
   network: 'TRC20',
   wallet_address: '',
   instructions: '',
+  support_url: '',
 };
 
 export function SettingsView() {
@@ -59,6 +61,7 @@ export function SettingsView() {
       network: data.network || '',
       wallet_address: data.wallet_address || '',
       instructions: data.instructions || '',
+      support_url: data.support_url || '',
     });
 
     setPreviewUrl((previous) => {
@@ -124,6 +127,7 @@ export function SettingsView() {
       network: form.network.trim(),
       wallet_address: form.wallet_address.trim(),
       instructions: form.instructions.trim(),
+      support_url: form.support_url.trim(),
       qr_code: selectedQrCode || undefined,
     });
   };
@@ -179,6 +183,15 @@ export function SettingsView() {
                 setForm((previous) => ({ ...previous, instructions: event.target.value }))
               }
               placeholder="Optional notes shown to users in the app"
+            />
+
+            <TextField
+              label="Support External Link"
+              value={form.support_url}
+              onChange={(event) =>
+                setForm((previous) => ({ ...previous, support_url: event.target.value }))
+              }
+              placeholder="https://t.me/your-support or https://wa.me/..."
             />
 
             <Stack spacing={1}>

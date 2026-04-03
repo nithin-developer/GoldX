@@ -34,7 +34,6 @@ class User(Base):
     withdrawals = relationship("Withdrawal", back_populates="user", lazy="selectin")
     signal_entries = relationship("UserSignalEntry", back_populates="user", lazy="selectin")
     notifications = relationship("Notification", back_populates="user", lazy="selectin")
-    support_messages = relationship("SupportMessage", back_populates="user", lazy="selectin")
     referrals_made = relationship(
         "Referral",
         back_populates="referrer",

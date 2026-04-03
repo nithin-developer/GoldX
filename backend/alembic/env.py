@@ -16,7 +16,7 @@ from app.core.database import Base
 from app.models import (  # noqa: F401
     User, Signal, SignalCode, UserSignalEntry,
     WalletTransaction, Deposit, Withdrawal,
-    Referral, Notification, Announcement, SupportMessage,
+    Referral, Notification, Announcement,
 )
 
 target_metadata = Base.metadata

@@ -108,6 +108,7 @@ async def get_or_create_deposit_settings(db: AsyncSession) -> DepositWalletSetti
         network="TRC20",
         wallet_address=None,
         instructions=None,
+        support_url=None,
         qr_code_filename=None,
     )
     db.add(settings_data)
@@ -121,6 +122,7 @@ async def update_deposit_settings(
     network: str | None,
     wallet_address: str | None,
     instructions: str | None,
+    support_url: str | None,
     qr_code: UploadFile | None,
 ) -> DepositWalletSetting:
     settings_data = await get_or_create_deposit_settings(db)
@@ -133,6 +135,9 @@ async def update_deposit_settings(
     )
     settings_data.instructions = (
         instructions.strip() if instructions and instructions.strip() else None
+    )
+    settings_data.support_url = (
+        support_url.strip() if support_url and support_url.strip() else None
     )
 
     if qr_code:

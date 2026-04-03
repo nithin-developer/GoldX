@@ -54,6 +54,7 @@ class HomeDashboardResponse(BaseModel):
     vip_level: int
     total_referrals: int
     announcements: list = []
+    active_signal_alerts: list[str] = []
     recent_activities: list[HomeRecentActivityResponse] = []
 
 

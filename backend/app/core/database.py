@@ -417,6 +417,24 @@ def _ensure_wallet_public_ids_and_payment_proofs(sync_conn) -> None:
         )
 
 
+def _ensure_support_link_and_drop_legacy_support_table(sync_conn) -> None:
+    """Add support link column and remove deprecated support chat table."""
+    inspector = inspect(sync_conn)
+    table_names = set(inspector.get_table_names())
+
+    if "deposit_wallet_settings" in table_names:
+        settings_columns = {
+            column["name"] for column in inspector.get_columns("deposit_wallet_settings")
+        }
+        if "support_url" not in settings_columns:
+            sync_conn.execute(
+                text("ALTER TABLE deposit_wallet_settings ADD COLUMN support_url TEXT")
+            )
+
+    if "support_messages" in table_names:
+        sync_conn.execute(text("DROP TABLE IF EXISTS support_messages"))
+
+
 async def get_db() -> AsyncSession:
     """Dependency that provides an async database session."""
     async with async_session_factory() as session:
@@ -438,6 +456,7 @@ async def init_db():
         await conn.run_sync(_ensure_user_ids_and_invite_codes)
         await conn.run_sync(_ensure_signal_public_ids)
         await conn.run_sync(_ensure_wallet_public_ids_and_payment_proofs)
+        await conn.run_sync(_ensure_support_link_and_drop_legacy_support_table)
 
 
 async def close_db():

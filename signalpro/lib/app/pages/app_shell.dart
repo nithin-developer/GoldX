@@ -6,11 +6,12 @@ import 'package:signalpro/app/pages/notifications_page.dart';
 import 'package:signalpro/app/pages/profile_page.dart';
 import 'package:signalpro/app/pages/referrals_page.dart';
 import 'package:signalpro/app/pages/signals_page.dart';
-import 'package:signalpro/app/pages/support_chat_page.dart';
 import 'package:signalpro/app/pages/withdraw_page.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
+import 'package:signalpro/app/services/wallet_api.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/app_header.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum AppTab { home, signals, market, referrals, profile }
 
@@ -25,6 +26,8 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   AppTab _currentTab = AppTab.home;
+  WalletApi? _walletApi;
+  bool _openingSupportLink = false;
 
   void _openDeposit() => Navigator.of(
     context,
@@ -34,9 +37,74 @@ class _AppShellState extends State<AppShell> {
     context,
   ).push(MaterialPageRoute<void>(builder: (_) => const WithdrawPage()));
 
-  void _openSupport() => Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (_) => const SupportChatPage()));
+  void _openSupport() {
+    _openSupportExternalLink();
+  }
+
+  Future<void> _openSupportExternalLink() async {
+    if (_openingSupportLink) {
+      return;
+    }
+
+    _openingSupportLink = true;
+    _walletApi ??= WalletApi(dio: AuthScope.of(context).apiClient.dio);
+
+    try {
+      final details = await _walletApi!.getDepositWalletDetails();
+      final supportUrl = details.supportUrl?.trim();
+
+      if (supportUrl == null || supportUrl.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Support link is not configured yet.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final normalizedUrl =
+          supportUrl.startsWith('http://') || supportUrl.startsWith('https://')
+          ? supportUrl
+          : 'https://$supportUrl';
+
+      final launchUri = Uri.tryParse(normalizedUrl);
+      if (launchUri == null || !launchUri.hasScheme) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Support link is invalid. Contact administrator.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final launched = await launchUrl(
+        launchUri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to open support link on this device.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not load support link. Please try again.'),
+          ),
+        );
+      }
+    } finally {
+      _openingSupportLink = false;
+    }
+  }
 
   Future<void> _openNotifications() async {
     await Navigator.of(

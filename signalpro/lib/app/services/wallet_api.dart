@@ -58,6 +58,7 @@ class DepositWalletDetails {
     required this.network,
     required this.walletAddress,
     required this.instructions,
+    required this.supportUrl,
     required this.qrCodeUrl,
   });
 
@@ -65,6 +66,7 @@ class DepositWalletDetails {
   final String? network;
   final String? walletAddress;
   final String? instructions;
+  final String? supportUrl;
   final String? qrCodeUrl;
 
   factory DepositWalletDetails.fromJson(Map<String, dynamic> json) {
@@ -75,6 +77,7 @@ class DepositWalletDetails {
       network: (json['network'] as String?)?.trim(),
       walletAddress: (json['wallet_address'] as String?)?.trim(),
       instructions: (json['instructions'] as String?)?.trim(),
+      supportUrl: (json['support_url'] as String?)?.trim(),
       qrCodeUrl: resolvedQrCodeUrl,
     );
   }

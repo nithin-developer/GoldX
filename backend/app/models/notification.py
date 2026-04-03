@@ -35,19 +35,3 @@ class Announcement(Base):
 
     def __repr__(self):
         return f"<Announcement(id={self.id}, title={self.title})>"
-
-
-class SupportMessage(Base):
-    __tablename__ = "support_messages"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    sender_type = Column(String(10), nullable=False)  # "user" or "admin"
-    message = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
-    # Relationships
-    user = relationship("User", back_populates="support_messages")
-
-    def __repr__(self):
-        return f"<SupportMessage(id={self.id}, sender_type={self.sender_type})>"

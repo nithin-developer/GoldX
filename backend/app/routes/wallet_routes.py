@@ -165,6 +165,7 @@ async def get_deposit_settings(
         network=settings_data.network,
         wallet_address=settings_data.wallet_address,
         instructions=settings_data.instructions,
+        support_url=settings_data.support_url,
         qr_code_url=wallet_service.build_qr_code_url(
             settings_data.qr_code_filename,
             base_url,

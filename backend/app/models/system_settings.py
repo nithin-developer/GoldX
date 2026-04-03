@@ -11,6 +11,7 @@ class DepositWalletSetting(Base):
     network = Column(String(50), nullable=True, default="TRC20")
     wallet_address = Column(Text, nullable=True)
     instructions = Column(Text, nullable=True)
+    support_url = Column(Text, nullable=True)
     qr_code_filename = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(

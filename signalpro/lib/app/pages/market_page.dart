@@ -1,15 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
-import 'package:signalpro/app/widgets/tradingview_embedded_chart.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/section_header.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
@@ -19,130 +18,81 @@ class MarketPage extends StatefulWidget {
 }
 
 class _MarketPageState extends State<MarketPage> {
+  static const List<String> _intervals = <String>['1m', '5m', '15m'];
+
   static const List<_MarketCoin> _coins = [
     _MarketCoin(
       symbol: 'BTC',
       pair: 'BTCUSDT',
-      tradingViewSymbol: 'BITSTAMP:BTCUSD',
       label: 'BITCOIN / USDT',
       logoAsset: 'coins/btc.png',
     ),
     _MarketCoin(
       symbol: 'ETH',
       pair: 'ETHUSDT',
-      tradingViewSymbol: 'BINANCE:ETHUSDT',
       label: 'ETHEREUM / USDT',
       logoAsset: 'coins/eth.png',
     ),
     _MarketCoin(
       symbol: 'SOL',
       pair: 'SOLUSDT',
-      tradingViewSymbol: 'BINANCE:SOLUSDT',
       label: 'SOLANA / USDT',
       logoAsset: 'coins/sol.png',
     ),
     _MarketCoin(
       symbol: 'AVAX',
       pair: 'AVAXUSDT',
-      tradingViewSymbol: 'BINANCE:AVAXUSDT',
       label: 'AVALANCHE / USDT',
       logoAsset: 'coins/avax.png',
     ),
   ];
 
   final NumberFormat _priceFormat = NumberFormat('#,##0.00');
+  final NumberFormat _axisPriceFormat = NumberFormat('#,##0.00');
+  final Dio _binanceHttp = Dio(BaseOptions(baseUrl: 'https://api.binance.com'));
 
-  WebViewController? _chartController;
   WebSocketChannel? _tickerChannel;
   StreamSubscription<dynamic>? _tickerSubscription;
-  Timer? _reconnectTimer;
+  Timer? _tickerReconnectTimer;
+
+  WebSocketChannel? _candleChannel;
+  StreamSubscription<dynamic>? _candleSubscription;
+  Timer? _candleReconnectTimer;
 
   int _selectedIndex = 0;
-  bool _chartLoading = true;
-  String? _chartError;
+  String _selectedInterval = _intervals.first;
+
+  bool _candlesLoading = true;
+  bool _isCurrentCandleClosed = false;
+  String? _candlesError;
   String? _streamError;
   bool _isDisposed = false;
   bool _isActiveInTree = true;
+  int _candleRequestId = 0;
 
   double? _selectedPrice;
 
   final Map<String, double> _latestPrices = {};
   final Map<String, double> _dailyChangePercent = {};
-
-  bool get _supportsEmbeddedChart {
-    if (kIsWeb) {
-      return false;
-    }
-
-    return defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
-  }
+  final List<Candle> _candles = <Candle>[];
 
   @override
   void initState() {
     super.initState();
-
-    _initializeChart();
     _connectTickerStream();
-  }
-
-  void _initializeChart() {
-    if (kIsWeb) {
-      _chartLoading = false;
-      _chartError = null;
-      return;
-    }
-
-    if (!_supportsEmbeddedChart) {
-      _chartLoading = false;
-      _chartError = 'Chart is not supported on this platform.';
-      return;
-    }
-
-    try {
-      _chartController = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(const Color(0x00000000))
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onWebResourceError: (error) {
-              if (!mounted || error.isForMainFrame != true) {
-                return;
-              }
-
-              setState(() {
-                _chartLoading = false;
-                _chartError = 'Unable to load chart.';
-              });
-            },
-            onPageFinished: (_) {
-              if (!mounted) {
-                return;
-              }
-
-              setState(() {
-                _chartLoading = false;
-                _chartError = null;
-              });
-            },
-          ),
-        );
-
-      _loadTradingViewChart();
-    } catch (_) {
-      _chartController = null;
-      _chartLoading = false;
-      _chartError = 'Unable to initialize chart on this platform.';
-    }
+    _reloadCandlesForSelection();
   }
 
   @override
   void dispose() {
     _isDisposed = true;
-    _reconnectTimer?.cancel();
+    _tickerReconnectTimer?.cancel();
+    _candleReconnectTimer?.cancel();
     _tickerSubscription?.cancel();
+    _candleSubscription?.cancel();
     _tickerChannel?.sink.close();
+    _candleChannel?.sink.close();
+    _binanceHttp.close(force: true);
     super.dispose();
   }
 
@@ -168,95 +118,220 @@ class _MarketPageState extends State<MarketPage> {
     setState(() {
       _selectedIndex = index;
       _selectedPrice = _latestPrices[_coins[index].pair];
-      _chartLoading = !kIsWeb && _chartController != null;
-      _chartError = kIsWeb ? null : (_chartController == null ? 'Chart is not supported on this platform.' : null);
     });
-
-    if (!kIsWeb && _chartController != null) {
-      _loadTradingViewChart();
-    }
+    _reloadCandlesForSelection();
   }
 
-  Future<void> _loadTradingViewChart() async {
-    final controller = _chartController;
-    if (controller == null) {
+  void _onSelectInterval(String interval) {
+    if (_selectedInterval == interval) {
       return;
     }
 
-    final coin = _selectedCoin;
-    final html = '''
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: #0A1220;
-        height: 100%;
-        width: 100%;
-        overflow: hidden;
-      }
-      .tradingview-widget-container {
-        height: 100%;
-        width: 100%;
-      }
-      .tradingview-widget-copyright {
-        font-family: Arial, sans-serif;
-        font-size: 11px;
-        line-height: 32px;
-        text-align: center;
-      }
-      .blue-text {
-        color: #7CA9FF;
-      }
-      .trademark {
-        color: #A7B0C0;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="tradingview-widget-container" style="height:100%;width:100%">
-      <div class="tradingview-widget-container__widget" style="height:calc(100% - 32px);width:100%"></div>
-      <div class="tradingview-widget-copyright">
-        <a href="https://www.tradingview.com/symbols/${coin.tradingViewSymbol.replaceAll(':', '/')}" rel="noopener nofollow" target="_blank">
-          <span class="blue-text">${coin.symbol} price</span>
-        </a>
-        <span class="trademark"> by TradingView</span>
-      </div>
-      <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-      {
-        "allow_symbol_change": false,
-        "calendar": false,
-        "details": false,
-        "hide_side_toolbar": true,
-        "hide_top_toolbar": false,
-        "hide_legend": false,
-        "hide_volume": false,
-        "hotlist": false,
-        "interval": "D",
-        "locale": "en",
-        "save_image": true,
-        "style": "1",
-        "symbol": "${coin.tradingViewSymbol}",
-        "theme": "dark",
-        "timezone": "Etc/UTC",
-        "backgroundColor": "#0A1220",
-        "gridColor": "rgba(242, 242, 242, 0.06)",
-        "watchlist": [],
-        "withdateranges": false,
-        "compareSymbols": [],
-        "studies": [],
-        "autosize": true
-      }
-      </script>
-    </div>
-  </body>
-</html>
-''';
+    setState(() {
+      _selectedInterval = interval;
+    });
+    _reloadCandlesForSelection();
+  }
 
-    await controller.loadHtmlString(html);
+  Future<void> _reloadCandlesForSelection() async {
+    final requestId = ++_candleRequestId;
+    final pair = _selectedCoin.pair;
+    final interval = _selectedInterval;
+
+    if (_canMutateState) {
+      setState(() {
+        _candlesLoading = true;
+        _candlesError = null;
+        _isCurrentCandleClosed = false;
+      });
+    }
+
+    await _loadHistoricalCandles(
+      pair: pair,
+      interval: interval,
+      requestId: requestId,
+    );
+
+    if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+      return;
+    }
+
+    _connectCandleStream(pair: pair, interval: interval, requestId: requestId);
+  }
+
+  bool _shouldApplyCandleUpdate(int requestId, String pair, String interval) {
+    return _canMutateState &&
+        requestId == _candleRequestId &&
+        pair == _selectedCoin.pair &&
+        interval == _selectedInterval;
+  }
+
+  Future<void> _loadHistoricalCandles({
+    required String pair,
+    required String interval,
+    required int requestId,
+  }) async {
+    try {
+      final response = await _binanceHttp.get<List<dynamic>>(
+        '/api/v3/klines',
+        queryParameters: {'symbol': pair, 'interval': interval, 'limit': 120},
+        options: Options(receiveTimeout: const Duration(seconds: 8)),
+      );
+
+      final rows = response.data ?? const <dynamic>[];
+      final candles = rows
+          .whereType<List<dynamic>>()
+          .map((row) {
+            try {
+              return Candle.fromRest(row);
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<Candle>()
+          .toList(growable: false);
+
+      if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+        return;
+      }
+
+      setState(() {
+        _candles
+          ..clear()
+          ..addAll(candles);
+        _candlesLoading = false;
+        _candlesError = candles.isEmpty
+            ? 'No candle data received for ${_selectedCoin.symbol} ($_selectedInterval).'
+            : null;
+        _isCurrentCandleClosed = candles.isNotEmpty
+            ? candles.last.isClosed
+            : false;
+      });
+    } catch (_) {
+      if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+        return;
+      }
+
+      setState(() {
+        _candlesLoading = false;
+        _candlesError = 'Unable to load historical candles. Please try again.';
+      });
+    }
+  }
+
+  void _connectCandleStream({
+    required String pair,
+    required String interval,
+    required int requestId,
+  }) {
+    if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+      return;
+    }
+
+    _candleReconnectTimer?.cancel();
+    _candleSubscription?.cancel();
+    _candleChannel?.sink.close();
+
+    _candleChannel = WebSocketChannel.connect(
+      Uri.parse(
+        'wss://stream.binance.com:9443/ws/${pair.toLowerCase()}@kline_$interval',
+      ),
+    );
+
+    _candleSubscription = _candleChannel!.stream.listen(
+      (message) {
+        Map<String, dynamic> payload;
+        try {
+          final decoded = jsonDecode(message as String);
+          if (decoded is! Map<String, dynamic>) {
+            return;
+          }
+          payload = decoded;
+        } catch (_) {
+          return;
+        }
+
+        Candle candle;
+        try {
+          candle = Candle.fromBinance(payload);
+        } catch (_) {
+          return;
+        }
+
+        if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+          return;
+        }
+
+        setState(() {
+          _candlesLoading = false;
+          _candlesError = null;
+          _isCurrentCandleClosed = candle.isClosed;
+
+          if (_candles.isNotEmpty && _candles.last.time == candle.time) {
+            _candles[_candles.length - 1] = candle;
+          } else {
+            _candles.add(candle);
+            if (_candles.length > 300) {
+              _candles.removeAt(0);
+            }
+          }
+        });
+      },
+      onError: (_) {
+        if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+          return;
+        }
+
+        setState(() {
+          _candlesError = 'Live candle stream disconnected. Reconnecting...';
+        });
+
+        _scheduleCandleReconnect(
+          pair: pair,
+          interval: interval,
+          requestId: requestId,
+        );
+      },
+      onDone: () {
+        if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+          return;
+        }
+
+        setState(() {
+          _candlesError = 'Live candle stream disconnected. Reconnecting...';
+        });
+
+        _scheduleCandleReconnect(
+          pair: pair,
+          interval: interval,
+          requestId: requestId,
+        );
+      },
+      cancelOnError: true,
+    );
+  }
+
+  void _scheduleCandleReconnect({
+    required String pair,
+    required String interval,
+    required int requestId,
+  }) {
+    if (_isDisposed) {
+      return;
+    }
+
+    _candleReconnectTimer?.cancel();
+    _candleReconnectTimer = Timer(const Duration(seconds: 2), () {
+      if (!_shouldApplyCandleUpdate(requestId, pair, interval)) {
+        return;
+      }
+
+      _connectCandleStream(
+        pair: pair,
+        interval: interval,
+        requestId: requestId,
+      );
+    });
   }
 
   void _connectTickerStream() {
@@ -264,11 +339,13 @@ class _MarketPageState extends State<MarketPage> {
       return;
     }
 
-    _reconnectTimer?.cancel();
+    _tickerReconnectTimer?.cancel();
     _tickerSubscription?.cancel();
     _tickerChannel?.sink.close();
 
-    final streams = _coins.map((coin) => '${coin.pair.toLowerCase()}@kline_1d').join('/');
+    final streams = _coins
+        .map((coin) => '${coin.pair.toLowerCase()}@kline_1d')
+        .join('/');
     _tickerChannel = WebSocketChannel.connect(
       Uri.parse('wss://stream.binance.com:9443/stream?streams=$streams'),
     );
@@ -291,7 +368,11 @@ class _MarketPageState extends State<MarketPage> {
         final openPrice = double.tryParse(kline['o'].toString());
         final lastPrice = double.tryParse(kline['c'].toString());
 
-        if (pair == null || openPrice == null || openPrice <= 0 || lastPrice == null || !_canMutateState) {
+        if (pair == null ||
+            openPrice == null ||
+            openPrice <= 0 ||
+            lastPrice == null ||
+            !_canMutateState) {
           return;
         }
 
@@ -317,7 +398,7 @@ class _MarketPageState extends State<MarketPage> {
           _streamError = 'Live price stream disconnected. Reconnecting...';
         });
 
-        _scheduleReconnect();
+        _scheduleTickerReconnect();
       },
       onDone: () {
         if (!_canMutateState) {
@@ -328,7 +409,7 @@ class _MarketPageState extends State<MarketPage> {
           _streamError = 'Live price stream disconnected. Reconnecting...';
         });
 
-        _scheduleReconnect();
+        _scheduleTickerReconnect();
       },
       cancelOnError: true,
     );
@@ -336,13 +417,13 @@ class _MarketPageState extends State<MarketPage> {
 
   bool get _canMutateState => mounted && !_isDisposed && _isActiveInTree;
 
-  void _scheduleReconnect() {
+  void _scheduleTickerReconnect() {
     if (_isDisposed) {
       return;
     }
 
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 2), () {
+    _tickerReconnectTimer?.cancel();
+    _tickerReconnectTimer = Timer(const Duration(seconds: 2), () {
       if (!_canMutateState) {
         return;
       }
@@ -376,77 +457,153 @@ class _MarketPageState extends State<MarketPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_selectedCoin.label, style: const TextStyle(color: AppColors.textSecondary)),
+              Text(
+                _selectedCoin.label,
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 8),
               Text(
                 _formatPrice(_selectedPrice),
-                style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Text(
                 '${_formatPrice(_selectedPrice)} USD',
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 8),
-              _LiveDelta(
-                dailyPercent: _dailyChangePercent[_selectedCoin.pair],
-              ),
+              _LiveDelta(dailyPercent: _dailyChangePercent[_selectedCoin.pair]),
               if (_streamError != null) ...[
                 const SizedBox(height: 8),
                 Text(
                   _streamError!,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ],
           ),
         ),
         const SizedBox(height: 14),
-        const SectionHeader(title: 'Candlestick Chart'),
+        const SectionHeader(title: 'Candlestick Chart', actionText: 'LIVE'),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 36,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _intervals.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final interval = _intervals[index];
+              return _IntervalChip(
+                label: interval,
+                selected: interval == _selectedInterval,
+                onTap: () => _onSelectInterval(interval),
+              );
+            },
+          ),
+        ),
         const SizedBox(height: 8),
         GlassCard(
           child: SizedBox(
             height: 340,
             child: Stack(
               children: [
-                if (kIsWeb)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: TradingViewEmbeddedChart(
-                      key: ValueKey(_selectedCoin.tradingViewSymbol),
-                      symbol: _selectedCoin.tradingViewSymbol,
+                if (_candles.isNotEmpty)
+                  SfCartesianChart(
+                    plotAreaBorderWidth: 0,
+                    primaryXAxis: DateTimeAxis(
+                      edgeLabelPlacement: EdgeLabelPlacement.shift,
+                      intervalType: DateTimeIntervalType.minutes,
+                      dateFormat: DateFormat('HH:mm'),
+                      labelStyle: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 10,
+                      ),
+                      majorGridLines: MajorGridLines(
+                        color: AppColors.border.withValues(alpha: 0.35),
+                        width: 0.6,
+                      ),
                     ),
+                    primaryYAxis: NumericAxis(
+                      opposedPosition: true,
+                      numberFormat: _axisPriceFormat,
+                      axisLine: const AxisLine(width: 0),
+                      labelStyle: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 10,
+                      ),
+                      majorGridLines: MajorGridLines(
+                        color: AppColors.border.withValues(alpha: 0.35),
+                        width: 0.6,
+                      ),
+                    ),
+                    zoomPanBehavior: ZoomPanBehavior(
+                      enablePinching: true,
+                      enablePanning: true,
+                      enableMouseWheelZooming: true,
+                      enableDoubleTapZooming: true,
+                      zoomMode: ZoomMode.x,
+                    ),
+                    trackballBehavior: TrackballBehavior(
+                      enable: true,
+                      activationMode: ActivationMode.singleTap,
+                      tooltipDisplayMode: TrackballDisplayMode.floatAllPoints,
+                    ),
+                    series: <CandleSeries<Candle, DateTime>>[
+                      CandleSeries<Candle, DateTime>(
+                        dataSource: _candles,
+                        xValueMapper: (candle, _) => candle.time,
+                        lowValueMapper: (candle, _) => candle.low,
+                        highValueMapper: (candle, _) => candle.high,
+                        openValueMapper: (candle, _) => candle.open,
+                        closeValueMapper: (candle, _) => candle.close,
+                        bullColor: AppColors.success,
+                        bearColor: AppColors.danger,
+                        enableSolidCandles: true,
+                        width: 0.8,
+                        spacing: 0.25,
+                      ),
+                    ],
                   )
-                else if (_chartController != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: WebViewWidget(controller: _chartController!),
-                  )
-                else
+                else if (!_candlesLoading)
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        _chartError ?? 'Chart is not available on this platform.',
+                        _candlesError ??
+                            'No chart data available for the selected coin.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
                     ),
                   ),
-                if (_chartLoading) const Center(child: CircularProgressIndicator()),
-                if (_chartError != null)
+                if (_candlesLoading)
+                  const Center(child: CircularProgressIndicator()),
+                if (_candlesError != null && _candles.isNotEmpty)
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: Container(
                       margin: const EdgeInsets.all(10),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.danger.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: AppColors.danger),
                       ),
                       child: Text(
-                        _chartError!,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        _candlesError!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ),
                   ),
@@ -454,6 +611,35 @@ class _MarketPageState extends State<MarketPage> {
             ),
           ),
         ),
+        if (_candles.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                _isCurrentCandleClosed
+                    ? Icons.check_circle_outline_rounded
+                    : Icons.timelapse_rounded,
+                size: 14,
+                color: _isCurrentCandleClosed
+                    ? AppColors.success
+                    : AppColors.highlight,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  _isCurrentCandleClosed
+                      ? 'Latest $_selectedInterval candle closed'
+                      : 'Current $_selectedInterval candle is forming with live updates',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 14),
         const SectionHeader(title: 'Live Prices', actionText: 'Today'),
         const SizedBox(height: 8),
@@ -498,9 +684,13 @@ class _MarketPageState extends State<MarketPage> {
   Widget _chip(_MarketCoin coin, bool selected) {
     return Container(
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary.withValues(alpha: 0.28) : AppColors.surface,
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.28)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+        border: Border.all(
+          color: selected ? AppColors.primary : AppColors.border,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -511,7 +701,9 @@ class _MarketPageState extends State<MarketPage> {
             Text(
               coin.symbol,
               style: TextStyle(
-                color: selected ? AppColors.primaryBright : AppColors.textSecondary,
+                color: selected
+                    ? AppColors.primaryBright
+                    : AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -526,16 +718,133 @@ class _MarketCoin {
   const _MarketCoin({
     required this.symbol,
     required this.pair,
-    required this.tradingViewSymbol,
     required this.label,
     required this.logoAsset,
   });
 
   final String symbol;
   final String pair;
-  final String tradingViewSymbol;
   final String label;
   final String logoAsset;
+}
+
+class _IntervalChip extends StatelessWidget {
+  const _IntervalChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.24)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: selected ? AppColors.primaryBright : AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class Candle {
+  const Candle({
+    required this.time,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.isClosed,
+  });
+
+  final DateTime time;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final bool isClosed;
+
+  factory Candle.fromBinance(Map<String, dynamic> data) {
+    final klineRaw = data['k'];
+    if (klineRaw is! Map) {
+      throw const FormatException('Invalid Binance kline payload');
+    }
+
+    final kline = Map<String, dynamic>.from(klineRaw);
+    final time = DateTime.fromMillisecondsSinceEpoch(
+      _asInt(kline['t']),
+      isUtc: true,
+    ).toLocal();
+
+    return Candle(
+      time: time,
+      open: _asDouble(kline['o']),
+      high: _asDouble(kline['h']),
+      low: _asDouble(kline['l']),
+      close: _asDouble(kline['c']),
+      isClosed: kline['x'] == true,
+    );
+  }
+
+  factory Candle.fromRest(List<dynamic> row) {
+    if (row.length < 5) {
+      throw const FormatException('Invalid kline row');
+    }
+
+    final time = DateTime.fromMillisecondsSinceEpoch(
+      _asInt(row[0]),
+      isUtc: true,
+    ).toLocal();
+
+    return Candle(
+      time: time,
+      open: _asDouble(row[1]),
+      high: _asDouble(row[2]),
+      low: _asDouble(row[3]),
+      close: _asDouble(row[4]),
+      isClosed: true,
+    );
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+    if (value is double) {
+      return value.toInt();
+    }
+    return int.tryParse(value.toString()) ?? 0;
+  }
+
+  static double _asDouble(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+    if (value is int) {
+      return value.toDouble();
+    }
+    return double.tryParse(value.toString()) ?? 0;
+  }
 }
 
 class _PriceRow extends StatelessWidget {
@@ -564,7 +873,9 @@ class _PriceRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: selected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : Colors.transparent,
       ),
       child: Row(
         children: [
@@ -574,8 +885,17 @@ class _PriceRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(asset, style: const TextStyle(fontWeight: FontWeight.w700)),
-                Text(pair, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                Text(
+                  asset,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  pair,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),

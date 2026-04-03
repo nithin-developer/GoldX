@@ -26,6 +26,7 @@ async def get_deposit_settings(
         network=settings_data.network,
         wallet_address=settings_data.wallet_address,
         instructions=settings_data.instructions,
+        support_url=settings_data.support_url,
         qr_code_url=wallet_service.build_qr_code_url(
             settings_data.qr_code_filename,
             base_url,
@@ -41,6 +42,7 @@ async def update_deposit_settings(
     network: str | None = Form(None),
     wallet_address: str | None = Form(None),
     instructions: str | None = Form(None),
+    support_url: str | None = Form(None),
     qr_code: UploadFile | None = File(None),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -52,6 +54,7 @@ async def update_deposit_settings(
         network=network,
         wallet_address=wallet_address,
         instructions=instructions,
+        support_url=support_url,
         qr_code=qr_code,
     )
 
@@ -61,6 +64,7 @@ async def update_deposit_settings(
         network=settings_data.network,
         wallet_address=settings_data.wallet_address,
         instructions=settings_data.instructions,
+        support_url=settings_data.support_url,
         qr_code_url=wallet_service.build_qr_code_url(
             settings_data.qr_code_filename,
             base_url,

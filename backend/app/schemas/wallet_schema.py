@@ -63,6 +63,7 @@ class DepositSettingsResponse(BaseModel):
     network: Optional[str] = None
     wallet_address: Optional[str] = None
     instructions: Optional[str] = None
+    support_url: Optional[str] = None
     qr_code_url: Optional[str] = None
     updated_at: Optional[datetime] = None
 

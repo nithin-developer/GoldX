@@ -222,18 +222,39 @@ class _HomePageState extends State<HomePage> {
     return '\$${_priceFormat.format(price)}';
   }
 
-  String _buildAlertText(List<HomeAnnouncement> announcements) {
-    final active = announcements
-        .where((item) => item.message.trim().isNotEmpty)
-        .take(3)
-        .map((item) => item.message.trim())
+  String _buildAlertText(
+    List<HomeAnnouncement> announcements,
+    List<String> activeSignalAlerts,
+  ) {
+    final announcementSegments = announcements
+        .map((item) {
+          final title = item.title.trim();
+          final message = item.message.trim();
+          if (title.isNotEmpty && message.isNotEmpty) {
+            return '$title: $message';
+          }
+          if (message.isNotEmpty) {
+            return message;
+          }
+          return title;
+        })
+        .where((item) => item.isNotEmpty)
+        .take(4)
         .toList();
 
-    if (active.isEmpty) {
+    final signalSegments = activeSignalAlerts
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .take(4)
+        .toList();
+
+    final allSegments = <String>[...announcementSegments, ...signalSegments];
+
+    if (allSegments.isEmpty) {
       return 'Market Alert: BTC above \$72k | New ETH signals live | Refer and earn rewards';
     }
 
-    return active.join('  |  ');
+    return allSegments.join('  |  ');
   }
 
   @override
@@ -288,7 +309,12 @@ class _HomePageState extends State<HomePage> {
               ),
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
               children: [
-                _MarketAlertBanner(text: _buildAlertText(data.announcements)),
+                _MarketAlertBanner(
+                  text: _buildAlertText(
+                    data.announcements,
+                    data.activeSignalAlerts,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 _BalanceHeroCard(data: data),
                 const SizedBox(height: 16),
@@ -715,11 +741,7 @@ class _PerformanceChip extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.verified_user,
-                size: 14,
-                color: AppColors.secondary,
-              ),
+              Icon(Icons.verified_user, size: 14, color: AppColors.secondary),
               const SizedBox(width: 4),
               Text(
                 'VIP $activeSignals Level',
@@ -736,7 +758,6 @@ class _PerformanceChip extends StatelessWidget {
     );
   }
 }
-
 
 class _AssetCircleRow extends StatelessWidget {
   const _AssetCircleRow();
@@ -775,7 +796,6 @@ class _AssetCircle extends StatelessWidget {
     );
   }
 }
-
 
 class _QuickAction extends StatelessWidget {
   const _QuickAction({

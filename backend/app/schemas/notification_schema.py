@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 
@@ -52,11 +52,25 @@ class CreateNotificationRequest(BaseModel):
 class AnnouncementResponse(BaseModel):
     id: int
     title: str
+    content: str = Field(validation_alias="message")
     message: str
     is_active: bool
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    expires_at: Optional[datetime] = Field(default=None, validation_alias="end_date")
     created_at: datetime
+
+    @computed_field(return_type=Optional[int])
+    @property
+    def duration_hours(self) -> Optional[int]:
+        if self.start_date is None or self.end_date is None:
+            return None
+
+        total_seconds = (self.end_date - self.start_date).total_seconds()
+        if total_seconds <= 0:
+            return None
+
+        return max(1, int(round(total_seconds / 3600)))
 
     class Config:
         from_attributes = True
@@ -64,38 +78,30 @@ class AnnouncementResponse(BaseModel):
 
 class CreateAnnouncementRequest(BaseModel):
     title: str = Field(..., max_length=500)
-    message: str
+    message: Optional[str] = None
+    content: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
-
-
-class SupportMessageResponse(BaseModel):
-    id: int
-    user_id: int
-    sender_type: str
-    message: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class SendSupportMessageRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=2000)
-
-
-class AdminSupportReplyRequest(BaseModel):
-    user_id: Optional[int] = Field(None, ge=1000000, le=9999999)
-    chat_id: Optional[int] = Field(None, ge=1000000, le=9999999)
-    message: str = Field(..., min_length=1, max_length=2000)
+    duration_hours: Optional[int] = Field(None, gt=0, le=720)
 
     @model_validator(mode="after")
-    def validate_target(self):
-        # Frontend may send either user_id or chat_id (chat_id maps to user_id).
-        if self.user_id is None and self.chat_id is None:
-            raise ValueError("Either user_id or chat_id is required")
-        if self.user_id is None:
-            self.user_id = self.chat_id
+    def normalize_announcement_payload(self):
+        resolved_message = (self.message or self.content or "").strip()
+        if not resolved_message:
+            raise ValueError("message or content is required")
+
+        self.message = resolved_message
+        if not self.content:
+            self.content = resolved_message
+
+        if self.end_date is None and self.duration_hours is not None:
+            start = self.start_date or datetime.now(timezone.utc)
+            self.start_date = start
+            self.end_date = start + timedelta(hours=self.duration_hours)
+
+        if self.start_date and self.end_date and self.end_date <= self.start_date:
+            raise ValueError("end_date must be greater than start_date")
+
         return self
 
 

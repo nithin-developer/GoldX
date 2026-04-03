@@ -197,8 +197,9 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 8),
               _TileCard(
                 title: 'Customer Support',
-                subtitle: 'Talk to a live agent',
+                subtitle: 'Open external support link',
                 icon: Icons.forum_outlined,
+                // ontap opens external link
                 onTap: widget.onSupport,
               ),
               const SizedBox(height: 10),

@@ -28,6 +28,7 @@ export type DepositSettings = {
   network?: string | null;
   wallet_address?: string | null;
   instructions?: string | null;
+  support_url?: string | null;
   qr_code_url?: string | null;
   updated_at?: string | null;
 };
@@ -37,6 +38,7 @@ export type UpdateDepositSettingsPayload = {
   network?: string;
   wallet_address?: string;
   instructions?: string;
+  support_url?: string;
   qr_code?: File;
 };
 
@@ -112,6 +114,10 @@ export const walletAdminService = {
 
     if (payload.instructions !== undefined) {
       formData.append('instructions', payload.instructions);
+    }
+
+    if (payload.support_url !== undefined) {
+      formData.append('support_url', payload.support_url);
     }
 
     if (payload.qr_code) {

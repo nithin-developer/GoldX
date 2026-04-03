@@ -18,7 +18,6 @@ from app.routes.wallet_routes import router as wallet_router
 from app.routes.signal_routes import router as signal_router
 from app.routes.referral_routes import router as referral_router
 from app.routes.notification_routes import router as notification_router
-from app.routes.support_routes import router as support_router
 from app.routes.admin.users_admin import router as admin_users_router
 from app.routes.admin.signals_admin import router as admin_signals_router
 from app.routes.admin.reports_admin import router as admin_reports_router
@@ -106,7 +105,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     description=(
         "Trading Signals Platform API — manage users, wallets, signals, "
-        "referrals, notifications, and support. JWT-based auth with RBAC."
+        "referrals, notifications, and platform settings. JWT-based auth with RBAC."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -160,7 +159,6 @@ app.include_router(wallet_router, prefix=api_prefix)
 app.include_router(signal_router, prefix=api_prefix)
 app.include_router(referral_router, prefix=api_prefix)
 app.include_router(notification_router, prefix=api_prefix)
-app.include_router(support_router, prefix=api_prefix)
 app.include_router(admin_users_router, prefix=api_prefix)
 app.include_router(admin_signals_router, prefix=api_prefix)
 app.include_router(admin_reports_router, prefix=api_prefix)

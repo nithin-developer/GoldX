@@ -22,7 +22,6 @@ export const ReferralsPage = lazy(() => import('src/pages/referrals'));
 export const VipUsersPage = lazy(() => import('src/pages/vip-users'));
 export const NotificationsPage = lazy(() => import('src/pages/notifications'));
 export const AnnouncementsPage = lazy(() => import('src/pages/announcements'));
-export const SupportPage = lazy(() => import('src/pages/support'));
 export const ReportsPage = lazy(() => import('src/pages/reports'));
 export const SettingsPage = lazy(() => import('src/pages/settings'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
@@ -69,7 +68,6 @@ export const routesSection: RouteObject[] = [
       { path: 'vip-users', element: <VipUsersPage /> },
       { path: 'notifications', element: <NotificationsPage /> },
       { path: 'announcements', element: <AnnouncementsPage /> },
-      { path: 'support', element: <SupportPage /> },
       { path: 'reports', element: <ReportsPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],

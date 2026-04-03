@@ -125,6 +125,29 @@ async def _build_dashboard_summary(current_user: User, db: AsyncSession) -> dict
         {"id": a.id, "title": a.title, "message": a.message} for a in announcements
     ]
 
+    active_signal_result = await db.execute(
+        select(
+            Signal.asset,
+            Signal.direction,
+            Signal.profit_percent,
+            Signal.duration_hours,
+            Signal.created_at,
+        )
+        .where(Signal.status == "active")
+        .order_by(Signal.created_at.desc())
+        .limit(5)
+    )
+    active_signal_alerts: list[str] = []
+    for row in active_signal_result.all():
+        asset = (row.asset or "Signal").upper()
+        direction = (row.direction or "").upper()
+        if row.profit_percent is not None and row.duration_hours:
+            active_signal_alerts.append(
+                f"New {asset} {direction} signal live: target +{row.profit_percent:.2f}% in {row.duration_hours}h"
+            )
+        else:
+            active_signal_alerts.append(f"New active signal live for {asset}")
+
     return {
         "balance": current_user.wallet_balance,
         "active_signals": active_signals,
@@ -133,6 +156,7 @@ async def _build_dashboard_summary(current_user: User, db: AsyncSession) -> dict
         "vip_level": current_user.vip_level,
         "total_referrals": total_referrals,
         "announcements": announcement_list,
+        "active_signal_alerts": active_signal_alerts,
     }
 
 
@@ -371,5 +395,6 @@ async def get_home_dashboard(
         vip_level=summary["vip_level"],
         total_referrals=summary["total_referrals"],
         announcements=summary["announcements"],
+        active_signal_alerts=summary["active_signal_alerts"],
         recent_activities=recent_activities,
     )

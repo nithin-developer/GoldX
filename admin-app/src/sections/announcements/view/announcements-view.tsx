@@ -1,3 +1,5 @@
+import type { AxiosError } from 'axios';
+
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -43,7 +45,7 @@ export function AnnouncementsView() {
       setDurationHours('24');
       queryClient.invalidateQueries({ queryKey: ['announcements'] });
     },
-    onError: () => toast.error('Failed to create announcement'),
+    onError: (error) => toast.error(resolveApiErrorMessage(error)),
   });
 
   const onSubmit = () => {
@@ -139,4 +141,26 @@ export function AnnouncementsView() {
       </Stack>
     </DashboardContent>
   );
+}
+
+function resolveApiErrorMessage(error: unknown): string {
+  const axiosError = error as AxiosError<{ detail?: unknown; message?: string }>;
+  const detail = axiosError.response?.data?.detail;
+
+  if (typeof axiosError.response?.data?.message === 'string' && axiosError.response.data.message.trim()) {
+    return axiosError.response.data.message;
+  }
+
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0] as { msg?: string };
+    if (first?.msg) {
+      return first.msg;
+    }
+  }
+
+  return 'Failed to create announcement';
 }
