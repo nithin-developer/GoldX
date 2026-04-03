@@ -12,7 +12,7 @@ import Drawer, { drawerClasses } from '@mui/material/Drawer';
 import { usePathname } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
-import { Logo } from 'src/components/logo';
+// import { Logo } from 'src/components/logo';
 import { Scrollbar } from 'src/components/scrollbar';
 
 import { NavUpgrade } from '../components/nav-upgrade';
@@ -20,6 +20,7 @@ import { WorkspacesPopover } from '../components/workspaces-popover';
 
 import type { NavItem } from '../nav-config-dashboard';
 import type { WorkspacesPopoverProps } from '../components/workspaces-popover';
+import logo from 'src/assets/logo.png';
 
 // ----------------------------------------------------------------------
 
@@ -112,7 +113,12 @@ export function NavContent({ data, slots, workspaces, sx }: NavContentProps) {
 
   return (
     <>
-      <Logo />
+      <Box
+        component="img"
+        src={logo}
+        alt="GoldX Trading Signals"
+        sx={{ width: 150, maxWidth: 220, height: 'auto' }}
+      />
 
       {slots?.topArea}
 

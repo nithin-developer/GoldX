@@ -69,7 +69,7 @@ export function DashboardLayout({
         <>
           {/** @slot Nav mobile */}
           <Typography variant="h6" component="h1" sx={{ display: { xs: 'none', sm: 'block' } }}>
-            Trading Signals
+            GoldX Trading Signals
           </Typography>
           {/* <Searchbar /> */}
 
