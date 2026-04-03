@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/primary_button.dart';
@@ -41,15 +42,19 @@ class _FollowSignalPageState extends State<FollowSignalPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Follow Signal')),
+      appBar: AppBar(title: Text(l10n.tr('Follow Signal'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const GlassCard(
+          GlassCard(
             child: Text(
-              'Enter a signal code from your analyst or SignalPro channel. Valid examples look like SIG-X922.',
-              style: TextStyle(color: AppColors.textSecondary),
+              l10n.tr(
+                'Enter a signal code from your analyst or GoldX channel. Valid examples look like SIG-X922.',
+              ),
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
           const SizedBox(height: 14),
@@ -60,7 +65,7 @@ class _FollowSignalPageState extends State<FollowSignalPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: AppColors.surface,
-              hintText: 'SIG-XXXX',
+              hintText: l10n.tr('SIG-XXXX'),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: const BorderSide(color: AppColors.border),
@@ -77,7 +82,9 @@ class _FollowSignalPageState extends State<FollowSignalPage> {
           ),
           const SizedBox(height: 14),
           PrimaryButton(
-            text: _state == FollowState.loading ? 'Validating...' : 'Activate Signal',
+            text: _state == FollowState.loading
+                ? l10n.tr('Validating...')
+                : l10n.tr('Activate Signal'),
             onPressed: _state == FollowState.loading ? null : _submit,
             icon: Icons.bolt_rounded,
           ),
@@ -92,9 +99,11 @@ class _FollowSignalPageState extends State<FollowSignalPage> {
   }
 
   Widget _buildStateWidget() {
+    final l10n = context.l10n;
+
     switch (_state) {
       case FollowState.loading:
-        return const GlassCard(
+        return GlassCard(
           key: ValueKey('loading'),
           child: Row(
             children: [
@@ -104,7 +113,7 @@ class _FollowSignalPageState extends State<FollowSignalPage> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
               SizedBox(width: 10),
-              Text('Checking signal integrity and market lock...'),
+              Text(l10n.tr('Checking signal integrity and market lock...')),
             ],
           ),
         );
@@ -112,12 +121,14 @@ class _FollowSignalPageState extends State<FollowSignalPage> {
         return GlassCard(
           key: const ValueKey('success'),
           child: Row(
-            children: const [
-              Icon(Icons.verified_rounded, color: AppColors.success),
-              SizedBox(width: 10),
+            children: [
+              const Icon(Icons.verified_rounded, color: AppColors.success),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Signal activated successfully. Position is now tracking real-time updates.',
+                  l10n.tr(
+                    'Signal activated successfully. Position is now tracking real-time updates.',
+                  ),
                 ),
               ),
             ],
@@ -127,12 +138,14 @@ class _FollowSignalPageState extends State<FollowSignalPage> {
         return GlassCard(
           key: const ValueKey('error'),
           child: Row(
-            children: const [
-              Icon(Icons.error_outline_rounded, color: AppColors.danger),
-              SizedBox(width: 10),
+            children: [
+              const Icon(Icons.error_outline_rounded, color: AppColors.danger),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Invalid code. Please verify with your analyst and try again.',
+                  l10n.tr(
+                    'Invalid code. Please verify with your analyst and try again.',
+                  ),
                 ),
               ),
             ],

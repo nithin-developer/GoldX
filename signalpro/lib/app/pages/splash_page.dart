@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
 
 class SplashPage extends StatelessWidget {
@@ -6,12 +7,18 @@ class SplashPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       body: Container(
         width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF081126), Color(0xFF0C1730), Color(0xFF0B1220)],
+            colors: [
+              AppColors.background,
+              AppColors.surfaceSoft,
+              AppColors.backgroundSecondary,
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -20,32 +27,25 @@ class SplashPage extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-              Container(
-                width: 124,
-                height: 124,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(34),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primaryBright, AppColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x66528DFF),
-                      blurRadius: 40,
-                      spreadRadius: 2,
-                    ),
-                  ],
+              SizedBox(
+                width: 180,
+                height: 180,
+                // child: const Icon(Icons.signal_cellular_alt_rounded, size: 62, color: AppColors.background),
+                child: const Image(
+                  image: AssetImage('splash_screen.png'),
+                  height: 180,
+                  fit: BoxFit.fill,
                 ),
-                child: const Icon(Icons.signal_cellular_alt_rounded, size: 62, color: AppColors.background),
               ),
               const SizedBox(height: 18),
-              const Text('SignalPro', style: TextStyle(fontSize: 42, fontWeight: FontWeight.w800)),
+              // Text(
+              //   l10n.tr('GoldX'),
+              //   style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w800),
+              // ),
               const Spacer(),
-              const Text(
-                'SECURELY CONNECTING TO SIGNALPRO...',
-                style: TextStyle(fontSize: 11, letterSpacing: 2, color: AppColors.textSecondary, fontWeight: FontWeight.w700),
+              Text(
+                l10n.tr('SECURELY CONNECTING TO GOLDX...'),
+                style: const TextStyle(fontSize: 11, letterSpacing: 2, color: AppColors.textSecondary, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 16),
               Container(
@@ -59,12 +59,12 @@ class SplashPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _DotLabel(label: 'ENCRYPTED'),
-                  SizedBox(width: 20),
-                  _DotLabel(label: 'LIVE SYNC'),
+                  _DotLabel(label: l10n.tr('ENCRYPTED')),
+                  const SizedBox(width: 20),
+                  _DotLabel(label: l10n.tr('LIVE SYNC')),
                 ],
               ),
               const SizedBox(height: 42),

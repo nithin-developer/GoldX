@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/models/app_notification.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/app_data_api.dart';
@@ -59,9 +60,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(l10n.tr('Notifications')),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -75,7 +78,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           if (snapshot.hasError) {
             final message = snapshot.error is ApiException
                 ? (snapshot.error as ApiException).message
-                : 'Unable to load notifications right now.';
+                : l10n.tr('Unable to load notifications right now.');
             return _ErrorState(message: message, onRetry: _refresh);
           }
 
@@ -88,10 +91,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   parent: BouncingScrollPhysics(),
                 ),
                 padding: const EdgeInsets.all(16),
-                children: const [
+                children: [
                   EmptyStateIllustration(
-                    title: 'No Notifications Yet',
-                    subtitle: 'Admin updates and alerts will appear here.',
+                    title: l10n.tr('No Notifications Yet'),
+                    subtitle: l10n.tr('Admin updates and alerts will appear here.'),
                     icon: Icons.notifications_off_outlined,
                   ),
                 ],
@@ -126,18 +129,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Admin Notification Center',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+                                l10n.tr('Admin Notification Center'),
+                                style: const TextStyle(fontWeight: FontWeight.w700),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
-                                'All unseen messages are automatically marked as read.',
-                                style: TextStyle(
+                                l10n.tr(
+                                  'All unseen messages are automatically marked as read.',
+                                ),
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textSecondary,
                                 ),
@@ -259,6 +264,8 @@ class _TypePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -267,7 +274,7 @@ class _TypePill extends StatelessWidget {
         color: AppColors.surfaceSoft,
       ),
       child: Text(
-        _label(type),
+        l10n.notificationTypeLabel(type),
         style: const TextStyle(
           color: AppColors.textSecondary,
           fontSize: 10,
@@ -276,19 +283,6 @@ class _TypePill extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _label(String value) {
-    switch (value) {
-      case 'signal':
-        return 'SIGNAL';
-      case 'referral':
-        return 'REFERRAL';
-      case 'support':
-        return 'SUPPORT';
-      default:
-        return 'SYSTEM';
-    }
   }
 }
 
@@ -300,6 +294,8 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -309,7 +305,10 @@ class _ErrorState extends StatelessWidget {
             children: [
               const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 34),
               const SizedBox(height: 8),
-              const Text('Unable to load notifications', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                l10n.tr('Unable to load notifications'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
               Text(
                 message,
@@ -317,7 +316,7 @@ class _ErrorState extends StatelessWidget {
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
-              PrimaryButton(text: 'Retry', onPressed: onRetry),
+              PrimaryButton(text: l10n.tr('Retry'), onPressed: onRetry),
             ],
           ),
         ),

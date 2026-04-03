@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/services/wallet_api.dart';
@@ -79,25 +80,27 @@ class _DepositPageState extends State<DepositPage> {
   }
 
   Future<void> _copyAddress() async {
+    final l10n = context.l10n;
     final address = _walletDetails?.walletAddress ?? '';
     if (address.trim().isEmpty) {
-      _showMessage('Wallet address is not configured yet.');
+      _showMessage(l10n.tr('Wallet address is not configured yet.'));
       return;
     }
 
     await Clipboard.setData(ClipboardData(text: address));
-    _showMessage('Wallet address copied to clipboard');
+    _showMessage(l10n.tr('Wallet address copied to clipboard'));
   }
 
   Future<void> _confirmDeposit() async {
+    final l10n = context.l10n;
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
     if (amount <= 0) {
-      _showMessage('Please enter a valid deposit amount');
+      _showMessage(l10n.tr('Please enter a valid deposit amount'));
       return;
     }
 
     if (_paymentScreenshot == null) {
-      _showMessage('Please upload payment proof screenshot');
+      _showMessage(l10n.tr('Please upload payment proof screenshot'));
       return;
     }
 
@@ -116,9 +119,10 @@ class _DepositPageState extends State<DepositPage> {
         return;
       }
 
-      _showMessage(
-        'Deposit request #${result.id} submitted successfully for review.',
-      );
+      _showMessage(l10n.tr(
+        'Deposit request #{id} submitted successfully for review.',
+        params: <String, String>{'id': result.id},
+      ));
 
       setState(() {
         _amountController.clear();
@@ -152,6 +156,8 @@ class _DepositPageState extends State<DepositPage> {
   }
 
   Future<void> _pickPaymentScreenshot() async {
+    final l10n = context.l10n;
+
     setState(() {
       _isPickingProof = true;
     });
@@ -167,14 +173,14 @@ class _DepositPageState extends State<DepositPage> {
       }
 
       if (picked == null) {
-        _showMessage('Screenshot selection cancelled');
+        _showMessage(l10n.tr('Screenshot selection cancelled'));
         return;
       }
 
       setState(() {
         _paymentScreenshot = picked;
       });
-      _showMessage('Payment proof selected');
+      _showMessage(l10n.tr('Payment proof selected'));
     } finally {
       if (mounted) {
         setState(() {
@@ -193,6 +199,7 @@ class _DepositPageState extends State<DepositPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     // USDT (TRC20)
     final currency = (_walletDetails?.currency ?? 'USDT').trim();
     final network = (_walletDetails?.network ?? '').trim();
@@ -202,7 +209,7 @@ class _DepositPageState extends State<DepositPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Deposit Funds'),
+        title: Text(l10n.tr('Deposit Funds')),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -213,9 +220,9 @@ class _DepositPageState extends State<DepositPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'CURRENT BALANCE',
-                  style: TextStyle(
+                Text(
+                  l10n.tr('CURRENT BALANCE'),
+                  style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 11,
                     letterSpacing: 1.2,
@@ -232,14 +239,14 @@ class _DepositPageState extends State<DepositPage> {
                   children: [
                     Expanded(
                       child: _StatusPill(
-                        title: 'Pending Deposits',
+                        title: l10n.tr('Pending Deposits'),
                         value: _currencyFormatter.format(_walletSummary.pendingDeposits),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _StatusPill(
-                        title: 'Pending Withdrawals',
+                        title: l10n.tr('Pending Withdrawals'),
                         value: _currencyFormatter.format(_walletSummary.pendingWithdrawals),
                       ),
                     ),
@@ -249,9 +256,9 @@ class _DepositPageState extends State<DepositPage> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
-            'Deposit Amount',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          Text(
+            l10n.tr('Deposit Amount'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -272,7 +279,7 @@ class _DepositPageState extends State<DepositPage> {
                 ),
               ),
               prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-              hintText: '0.00',
+              hintText: l10n.tr('0.00'),
               hintStyle: const TextStyle(color: AppColors.textMuted),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -290,9 +297,9 @@ class _DepositPageState extends State<DepositPage> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Quick Amounts',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          Text(
+            l10n.tr('Quick Amounts'),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
           const SizedBox(height: 10),
           Row(
@@ -305,9 +312,9 @@ class _DepositPageState extends State<DepositPage> {
             ],
           ),
           const SizedBox(height: 20),
-          const Text(
-            'Transaction Reference (Optional)',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          Text(
+            l10n.tr('Transaction Reference (Optional)'),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -315,7 +322,7 @@ class _DepositPageState extends State<DepositPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: AppColors.background,
-              hintText: 'Enter transaction ID if available',
+              hintText: l10n.tr('Enter transaction ID if available'),
               hintStyle: const TextStyle(color: AppColors.textMuted),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -337,9 +344,9 @@ class _DepositPageState extends State<DepositPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'PAYMENT PROOF',
-                  style: TextStyle(
+                Text(
+                  l10n.tr('PAYMENT PROOF'),
+                  style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                     letterSpacing: 1.2,
@@ -349,8 +356,15 @@ class _DepositPageState extends State<DepositPage> {
                 const SizedBox(height: 10),
                 Text(
                   _paymentScreenshot == null
-                      ? 'Upload a screenshot of your payment transaction.'
-                      : 'Selected file: ${_paymentScreenshot!.name}',
+                      ? l10n.tr(
+                          'Upload a screenshot of your payment transaction.',
+                        )
+                      : l10n.tr(
+                          'Selected file: {name}',
+                          params: <String, String>{
+                            'name': _paymentScreenshot!.name,
+                          },
+                        ),
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -360,10 +374,10 @@ class _DepositPageState extends State<DepositPage> {
                 const SizedBox(height: 14),
                 PrimaryButton(
                   text: _isPickingProof
-                      ? 'Selecting...'
+                    ? l10n.tr('Selecting...')
                       : _paymentScreenshot == null
-                      ? 'Upload Screenshot'
-                      : 'Change Screenshot',
+                    ? l10n.tr('Upload Screenshot')
+                    : l10n.tr('Change Screenshot'),
                   onPressed: (_isPickingProof || _isSubmitting || _isLoading)
                       ? null
                       : _pickPaymentScreenshot,
@@ -387,7 +401,10 @@ class _DepositPageState extends State<DepositPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Deposit $walletTitle',
+                        l10n.tr(
+                          'Deposit {walletTitle}',
+                          params: <String, String>{'walletTitle': walletTitle},
+                        ),
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -410,9 +427,9 @@ class _DepositPageState extends State<DepositPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'WALLET ADDRESS',
-                  style: TextStyle(
+                Text(
+                  l10n.tr('WALLET ADDRESS'),
+                  style: const TextStyle(
                     fontSize: 10,
                     color: AppColors.textSecondary,
                     letterSpacing: 1.2,
@@ -431,7 +448,9 @@ class _DepositPageState extends State<DepositPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          walletAddress.isEmpty ? 'Wallet address not configured yet.' : walletAddress,
+                          walletAddress.isEmpty
+                              ? l10n.tr('Wallet address not configured yet.')
+                              : walletAddress,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 14),
                         ),
@@ -465,13 +484,15 @@ class _DepositPageState extends State<DepositPage> {
           const SizedBox(height: 16),
           GlassCard(
             child: Row(
-              children: const [
-                Icon(Icons.info_outline_rounded, color: AppColors.primaryBright, size: 18),
-                SizedBox(width: 10),
+              children: [
+                const Icon(Icons.info_outline_rounded, color: AppColors.primaryBright, size: 18),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Deposits are queued for admin approval. Add transaction reference to speed up verification.',
-                    style: TextStyle(
+                    l10n.tr(
+                      'Deposits are queued for admin approval. Add transaction reference to speed up verification.',
+                    ),
+                    style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                       height: 1.35,
@@ -483,7 +504,9 @@ class _DepositPageState extends State<DepositPage> {
           ),
           const SizedBox(height: 20),
           PrimaryButton(
-            text: _isSubmitting ? 'Submitting...' : 'Submit Deposit Request',
+            text: _isSubmitting
+                ? l10n.tr('Submitting...')
+                : l10n.tr('Submit Deposit Request'),
             onPressed: _isSubmitting || _isLoading || _isPickingProof
                 ? null
                 : _confirmDeposit,

@@ -9,6 +9,7 @@ export type SignalData = {
   profit_percent: number;
   duration_hours: number;
   status: string;
+  vip_only: boolean;
   created_at?: string;
 };
 
@@ -17,6 +18,7 @@ export type CreateSignalPayload = {
   direction: string;
   profit_percent: number;
   duration_hours: number;
+  vip_only: boolean;
 };
 
 export type SignalCodeResponse = {

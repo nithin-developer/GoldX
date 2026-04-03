@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/section_header.dart';
@@ -69,6 +70,12 @@ class _MarketPageState extends State<MarketPage> {
   bool _isDisposed = false;
   bool _isActiveInTree = true;
   int _candleRequestId = 0;
+
+    String get _candleReconnectMessage =>
+      context.l10n.tr('Live candle stream disconnected. Reconnecting...');
+
+    String get _tickerReconnectMessage =>
+      context.l10n.tr('Live price stream disconnected. Reconnecting...');
 
   double? _selectedPrice;
 
@@ -201,7 +208,13 @@ class _MarketPageState extends State<MarketPage> {
           ..addAll(candles);
         _candlesLoading = false;
         _candlesError = candles.isEmpty
-            ? 'No candle data received for ${_selectedCoin.symbol} ($_selectedInterval).'
+            ? context.l10n.tr(
+                'No candle data received for {symbol} ({interval}).',
+                params: <String, String>{
+                  'symbol': _selectedCoin.symbol,
+                  'interval': _selectedInterval,
+                },
+              )
             : null;
         _isCurrentCandleClosed = candles.isNotEmpty
             ? candles.last.isClosed
@@ -214,7 +227,9 @@ class _MarketPageState extends State<MarketPage> {
 
       setState(() {
         _candlesLoading = false;
-        _candlesError = 'Unable to load historical candles. Please try again.';
+        _candlesError = context.l10n.tr(
+          'Unable to load historical candles. Please try again.',
+        );
       });
     }
   }
@@ -283,7 +298,7 @@ class _MarketPageState extends State<MarketPage> {
         }
 
         setState(() {
-          _candlesError = 'Live candle stream disconnected. Reconnecting...';
+          _candlesError = _candleReconnectMessage;
         });
 
         _scheduleCandleReconnect(
@@ -298,7 +313,7 @@ class _MarketPageState extends State<MarketPage> {
         }
 
         setState(() {
-          _candlesError = 'Live candle stream disconnected. Reconnecting...';
+          _candlesError = _candleReconnectMessage;
         });
 
         _scheduleCandleReconnect(
@@ -395,7 +410,7 @@ class _MarketPageState extends State<MarketPage> {
         }
 
         setState(() {
-          _streamError = 'Live price stream disconnected. Reconnecting...';
+          _streamError = _tickerReconnectMessage;
         });
 
         _scheduleTickerReconnect();
@@ -406,7 +421,7 @@ class _MarketPageState extends State<MarketPage> {
         }
 
         setState(() {
-          _streamError = 'Live price stream disconnected. Reconnecting...';
+          _streamError = _tickerReconnectMessage;
         });
 
         _scheduleTickerReconnect();
@@ -433,6 +448,8 @@ class _MarketPageState extends State<MarketPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -458,7 +475,7 @@ class _MarketPageState extends State<MarketPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _selectedCoin.label,
+                l10n.tr(_selectedCoin.label),
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 8),
@@ -489,7 +506,10 @@ class _MarketPageState extends State<MarketPage> {
           ),
         ),
         const SizedBox(height: 14),
-        const SectionHeader(title: 'Candlestick Chart', actionText: 'LIVE'),
+        SectionHeader(
+          title: l10n.tr('Candlestick Chart'),
+          actionText: l10n.tr('LIVE'),
+        ),
         const SizedBox(height: 8),
         SizedBox(
           height: 36,
@@ -576,7 +596,9 @@ class _MarketPageState extends State<MarketPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         _candlesError ??
-                            'No chart data available for the selected coin.',
+                            l10n.tr(
+                              'No chart data available for the selected coin.',
+                            ),
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.textSecondary),
                       ),
@@ -628,8 +650,18 @@ class _MarketPageState extends State<MarketPage> {
               Expanded(
                 child: Text(
                   _isCurrentCandleClosed
-                      ? 'Latest $_selectedInterval candle closed'
-                      : 'Current $_selectedInterval candle is forming with live updates',
+                      ? l10n.tr(
+                          'Latest {interval} candle closed',
+                          params: <String, String>{
+                            'interval': _selectedInterval,
+                          },
+                        )
+                      : l10n.tr(
+                          'Current {interval} candle is forming with live updates',
+                          params: <String, String>{
+                            'interval': _selectedInterval,
+                          },
+                        ),
                   style: const TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 11,
@@ -641,7 +673,10 @@ class _MarketPageState extends State<MarketPage> {
           ),
         ],
         const SizedBox(height: 14),
-        const SectionHeader(title: 'Live Prices', actionText: 'Today'),
+        SectionHeader(
+          title: l10n.tr('Live Prices'),
+          actionText: l10n.tr('Today'),
+        ),
         const SizedBox(height: 8),
         GlassCard(
           child: Column(
@@ -651,7 +686,7 @@ class _MarketPageState extends State<MarketPage> {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _PriceRow(
                       asset: coin.symbol,
-                      pair: coin.label,
+                      pair: l10n.tr(coin.label),
                       logoAsset: coin.logoAsset,
                       price: _formatPrice(_latestPrices[coin.pair]),
                       change: _formatDayChange(_dailyChangePercent[coin.pair]),
@@ -955,9 +990,11 @@ class _LiveDelta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (dailyPercent == null) {
-      return const Text(
-        'Waiting for today\'s change...',
-        style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      final l10n = context.l10n;
+
+      return Text(
+        l10n.tr("Waiting for today's change..."),
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
       );
     }
 

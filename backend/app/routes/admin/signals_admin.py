@@ -44,7 +44,12 @@ async def create_signal(
     - **duration_hours**: Signal duration in hours
     """
     signal = await signal_service.create_signal(
-        data.asset, data.direction, data.profit_percent, data.duration_hours, db
+        data.asset,
+        data.direction,
+        data.profit_percent,
+        data.duration_hours,
+        data.vip_only,
+        db,
     )
     return SignalResponse.model_validate(signal)
 

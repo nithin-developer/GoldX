@@ -1,41 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/services/api_exception.dart';
+import 'package:signalpro/app/services/auth_api.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
-import 'package:signalpro/app/services/wallet_api.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/primary_button.dart';
 
-class WithdrawalPasswordPage extends StatefulWidget {
-  const WithdrawalPasswordPage({
-    required this.hasExistingPassword,
-    super.key,
-  });
-
-  final bool hasExistingPassword;
+class ChangePasswordPage extends StatefulWidget {
+  const ChangePasswordPage({super.key});
 
   @override
-  State<WithdrawalPasswordPage> createState() => _WithdrawalPasswordPageState();
+  State<ChangePasswordPage> createState() => _ChangePasswordPageState();
 }
 
-class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
-  WalletApi? _walletApi;
-  final TextEditingController _currentPasswordController = TextEditingController();
+class _ChangePasswordPageState extends State<ChangePasswordPage> {
+  AuthApi? _authApi;
+
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   bool _isSubmitting = false;
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
 
-  bool get _isUpdateMode => widget.hasExistingPassword;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _walletApi ??= WalletApi(dio: AuthScope.of(context).apiClient.dio);
+    _authApi ??= AuthApi(dio: AuthScope.of(context).apiClient.dio);
   }
 
   @override
@@ -52,37 +48,42 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
   }
 
   Future<void> _submit() async {
     final l10n = context.l10n;
-
     final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (_isUpdateMode && currentPassword.isEmpty) {
-      _showMessage(l10n.tr('Please enter your current withdrawal password.'));
+    if (currentPassword.isEmpty) {
+      _showMessage(l10n.tr('Please enter your current login password.'));
       return;
     }
 
     if (newPassword.isEmpty) {
-      _showMessage(l10n.tr('Please enter a new withdrawal password.'));
+      _showMessage(l10n.tr('Please enter a new login password.'));
       return;
     }
 
-    if (newPassword.length < 6) {
-      _showMessage(l10n.tr('Withdrawal password must be at least 6 characters.'));
+    if (newPassword.length < 8) {
+      _showMessage(l10n.tr('Login password must be at least 8 characters.'));
+      return;
+    }
+
+    if (newPassword == currentPassword) {
+      _showMessage(
+        l10n.tr('New login password must be different from current password.'),
+      );
       return;
     }
 
     if (confirmPassword != newPassword) {
-      _showMessage(l10n.tr('New password and confirmation do not match.'));
+      _showMessage(
+        l10n.tr('New login password and confirmation do not match.'),
+      );
       return;
     }
 
@@ -91,20 +92,16 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
     });
 
     try {
-      await _walletApi!.setOrUpdateWithdrawalPassword(
-        newWithdrawalPassword: newPassword,
-        currentWithdrawalPassword: _isUpdateMode ? currentPassword : null,
+      await _authApi!.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
       );
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        _isUpdateMode
-        ? l10n.tr('Withdrawal password updated successfully.')
-        : l10n.tr('Withdrawal password set successfully.'),
-      );
+      _showMessage(l10n.tr('Login password updated successfully.'));
       Navigator.of(context).pop(true);
     } on ApiException catch (error) {
       _showMessage(error.message);
@@ -120,13 +117,10 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final title = _isUpdateMode
-        ? l10n.tr('Update Withdrawal Password')
-        : l10n.tr('Set Withdrawal Password');
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Text(l10n.tr('Change Login Password')),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -156,17 +150,17 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        _isUpdateMode ? Icons.lock_reset_rounded : Icons.lock_open_rounded,
+                      child: const Icon(
+                        Icons.lock_reset_rounded,
                         color: AppColors.primaryBright,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _isUpdateMode
-                            ? l10n.tr('Your account is protected. Enter current password to update it.')
-                            : l10n.tr('No withdrawal password set yet. Create one to secure withdrawals.'),
+                        l10n.tr(
+                          'Your login password protects account access. Verify your current password before setting a new one.',
+                        ),
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
@@ -180,24 +174,22 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
             ),
           ),
           const SizedBox(height: 20),
-          if (_isUpdateMode) ...[
-            _PasswordInput(
-              label: l10n.tr('CURRENT WITHDRAWAL PASSWORD'),
-              controller: _currentPasswordController,
-              hint: l10n.tr('Enter current password'),
-              obscureText: _obscureCurrentPassword,
-              onToggleVisibility: () {
-                setState(() {
-                  _obscureCurrentPassword = !_obscureCurrentPassword;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
           _PasswordInput(
-            label: l10n.tr('NEW WITHDRAWAL PASSWORD'),
+            label: l10n.tr('CURRENT LOGIN PASSWORD'),
+            controller: _currentPasswordController,
+            hint: l10n.tr('Enter your current login password'),
+            obscureText: _obscureCurrentPassword,
+            onToggleVisibility: () {
+              setState(() {
+                _obscureCurrentPassword = !_obscureCurrentPassword;
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          _PasswordInput(
+            label: l10n.tr('NEW LOGIN PASSWORD'),
             controller: _newPasswordController,
-            hint: l10n.tr('Enter at least 6 characters'),
+            hint: l10n.tr('Enter a new login password'),
             obscureText: _obscureNewPassword,
             onToggleVisibility: () {
               setState(() {
@@ -207,9 +199,9 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
           ),
           const SizedBox(height: 16),
           _PasswordInput(
-            label: l10n.tr('CONFIRM NEW PASSWORD'),
+            label: l10n.tr('CONFIRM NEW LOGIN PASSWORD'),
             controller: _confirmPasswordController,
-            hint: l10n.tr('Re-enter new password'),
+            hint: l10n.tr('Re-enter new login password'),
             obscureText: _obscureConfirmPassword,
             onToggleVisibility: () {
               setState(() {
@@ -222,15 +214,19 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SecurityTipRow(text: l10n.tr('Use at least 6 characters.')),
+                _SecurityTipRow(
+                  text: l10n.tr(
+                    'Use at least 8 characters with letters and numbers.',
+                  ),
+                ),
                 const SizedBox(height: 10),
                 _SecurityTipRow(
-                  text: l10n.tr('Do not reuse your login password.'),
+                  text: l10n.tr('Do not share your password with anyone.'),
                 ),
                 const SizedBox(height: 10),
                 _SecurityTipRow(
                   text: l10n.tr(
-                    'You will need this password for every withdrawal request.',
+                    'You may be asked to login again on other devices after changing it.',
                   ),
                 ),
               ],
@@ -239,14 +235,10 @@ class _WithdrawalPasswordPageState extends State<WithdrawalPasswordPage> {
           const SizedBox(height: 20),
           PrimaryButton(
             text: _isSubmitting
-                ? (_isUpdateMode
-                      ? l10n.tr('Updating Password...')
-                      : l10n.tr('Setting Password...'))
-                : (_isUpdateMode
-                      ? l10n.tr('Update Withdrawal Password')
-                      : l10n.tr('Set Withdrawal Password')),
+                ? l10n.tr('Updating Login Password...')
+                : l10n.tr('Update Login Password'),
             onPressed: _isSubmitting ? null : _submit,
-            icon: _isUpdateMode ? Icons.lock_reset_rounded : Icons.lock_rounded,
+            icon: Icons.lock_reset_rounded,
           ),
         ],
       ),
@@ -276,10 +268,7 @@ class _PasswordInput extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -293,31 +282,24 @@ class _PasswordInput extends StatelessWidget {
             suffixIcon: IconButton(
               onPressed: onToggleVisibility,
               icon: Icon(
-                obscureText ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                obscureText
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
                 color: AppColors.textSecondary,
                 size: 20,
               ),
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: AppColors.border,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: AppColors.border, width: 1),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: AppColors.border,
-                width: 1,
-              ),
+              borderSide: const BorderSide(color: AppColors.border, width: 1),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,

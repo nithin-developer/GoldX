@@ -31,6 +31,8 @@ class SignalHistoryItem {
 
   bool get isActive => status.toLowerCase() == 'active';
 
+  bool get isExpired => status.toLowerCase() == 'expired';
+
   bool get isCompleted => status.toLowerCase() == 'completed';
 
   String get asset => signal?.asset ?? 'UNKNOWN';

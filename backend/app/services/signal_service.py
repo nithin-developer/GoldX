@@ -56,7 +56,12 @@ async def get_all_signals(db: AsyncSession, skip: int = 0, limit: int = 50) -> l
 
 
 async def create_signal(
-    asset: str, direction: str, profit_percent: float, duration_hours: int, db: AsyncSession
+    asset: str,
+    direction: str,
+    profit_percent: float,
+    duration_hours: int,
+    vip_only: bool,
+    db: AsyncSession,
 ) -> Signal:
     """Admin creates a new signal."""
     signal = Signal(
@@ -65,6 +70,7 @@ async def create_signal(
         profit_percent=profit_percent,
         duration_hours=duration_hours,
         status="active",
+        vip_only=vip_only,
     )
     db.add(signal)
     await db.flush()
@@ -173,6 +179,12 @@ async def activate_signal(user: User, signal_code: str, db: AsyncSession) -> Use
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Signal is not active",
+        )
+
+    if signal.vip_only and int(user.vip_level or 0) <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This signal is available for VIP users only",
         )
 
     # 5. Check user has balance

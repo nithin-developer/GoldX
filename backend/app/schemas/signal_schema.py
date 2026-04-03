@@ -14,6 +14,7 @@ class SignalResponse(BaseModel):
     profit_percent: float
     duration_hours: int
     status: str
+    vip_only: bool = False
     created_at: datetime
 
     class Config:
@@ -25,6 +26,7 @@ class CreateSignalRequest(BaseModel):
     direction: str = Field(..., pattern="^(long|short)$")
     profit_percent: float = Field(..., gt=0)
     duration_hours: int = Field(..., gt=0)
+    vip_only: bool = False
 
     @field_validator("direction", mode="before")
     @classmethod
@@ -48,6 +50,7 @@ class UpdateSignalRequest(BaseModel):
     profit_percent: Optional[float] = Field(None, gt=0)
     duration_hours: Optional[int] = Field(None, gt=0)
     status: Optional[str] = Field(None, pattern="^(active|expired|completed)$")
+    vip_only: Optional[bool] = None
 
     @field_validator("direction", mode="before")
     @classmethod

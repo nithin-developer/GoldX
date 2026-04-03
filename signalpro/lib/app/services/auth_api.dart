@@ -5,7 +5,8 @@ import 'package:signalpro/app/models/user_profile.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 
 class AuthApi {
-  AuthApi({Dio? dio}) : _dio = dio ?? Dio(BaseOptions(baseUrl: ApiConfig.baseUrl));
+  AuthApi({Dio? dio})
+    : _dio = dio ?? Dio(BaseOptions(baseUrl: ApiConfig.baseUrl));
 
   final Dio _dio;
 
@@ -16,10 +17,7 @@ class AuthApi {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/auth/login',
-        data: {
-          'email': email,
-          'password': password,
-        },
+        data: {'email': email, 'password': password},
       );
       return AuthTokens.fromJson(response.data!);
     } on DioException catch (error) {
@@ -38,12 +36,16 @@ class AuthApi {
       'email': email,
       'password': password,
       'invite_code': inviteCode.trim(),
-      if (fullName != null && fullName.trim().isNotEmpty) 'full_name': fullName.trim(),
+      if (fullName != null && fullName.trim().isNotEmpty)
+        'full_name': fullName.trim(),
       if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
     };
 
     try {
-      final response = await _dio.post<Map<String, dynamic>>('/auth/register', data: payload);
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/register',
+        data: payload,
+      );
       return AuthTokens.fromJson(response.data!);
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -74,11 +76,26 @@ class AuthApi {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/auth/me',
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
       return UserProfile.fromJson(response.data!);
+    } on DioException catch (error) {
+      throw mapDioError(error);
+    }
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/auth/change-password',
+        data: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
+      );
     } on DioException catch (error) {
       throw mapDioError(error);
     }

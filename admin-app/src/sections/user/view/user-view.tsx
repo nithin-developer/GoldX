@@ -105,6 +105,7 @@ export function UserView() {
               )}
 
               {users.map((user) => {
+                if (user.email !== 'admin@tradingsignals.com') {
                 const status = getUserStatus(user);
                 const blocked = isBlocked(status);
                 const nextStatus = blocked ? 'active' : 'blocked';
@@ -141,6 +142,7 @@ export function UserView() {
                     </TableCell>
                   </TableRow>
                 );
+              }
               })}
             </TableBody>
           </Table>

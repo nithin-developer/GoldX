@@ -1,5 +1,7 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
+import 'package:signalpro/app/widgets/auth_language_switcher.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({
@@ -14,7 +16,8 @@ class RegisterPage extends StatefulWidget {
     required String email,
     required String password,
     required String inviteCode,
-  }) onRegister;
+  })
+  onRegister;
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -24,7 +27,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final TextEditingController _inviteController = TextEditingController();
 
   final FocusNode _fullNameFocus = FocusNode();
@@ -86,22 +90,29 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    final l10n = context.l10n;
+
     final fullName = _fullNameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
     final inviteCode = _inviteController.text.trim();
 
-    if (fullName.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (fullName.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please complete all required fields.')),
+        SnackBar(
+          content: Text(l10n.tr('Please complete all required fields.')),
+        ),
       );
       return;
     }
 
     if (fullName.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name must be at least 2 characters.')),
+        SnackBar(content: Text(l10n.tr('Name must be at least 2 characters.'))),
       );
       return;
     }
@@ -109,35 +120,37 @@ class _RegisterPageState extends State<RegisterPage> {
     final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     if (!emailPattern.hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid email address.')),
+        SnackBar(content: Text(l10n.tr('Please enter a valid email address.'))),
       );
       return;
     }
 
     if (password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 8 characters.')),
+        SnackBar(
+          content: Text(l10n.tr('Password must be at least 8 characters.')),
+        ),
       );
       return;
     }
 
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match.')),
+        SnackBar(content: Text(l10n.tr('Passwords do not match.'))),
       );
       return;
     }
 
     if (inviteCode.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invite code is required.')),
+        SnackBar(content: Text(l10n.tr('Invite code is required.'))),
       );
       return;
     }
 
     if (!_acceptTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please accept terms to continue.')),
+        SnackBar(content: Text(l10n.tr('Please accept terms to continue.'))),
       );
       return;
     }
@@ -156,9 +169,9 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -168,13 +181,18 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0A1220), Color(0xFF0D1830), Color(0xFF0B1220)],
+            colors: [
+              AppColors.background,
+              AppColors.surfaceSoft,
+              AppColors.backgroundSecondary,
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -189,239 +207,322 @@ class _RegisterPageState extends State<RegisterPage> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return ScrollConfiguration(
-                    behavior: const MaterialScrollBehavior().copyWith(scrollbars: false),
+                    behavior: const MaterialScrollBehavior().copyWith(
+                      scrollbars: false,
+                    ),
                     child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
                         child: IntrinsicHeight(
                           child: Column(
-                          children: [
-                            const Center(
-                              child: Image(image: AssetImage('logo.png'), width: 224),
-                            ),
-                            const Spacer(),
-                            TweenAnimationBuilder<double>(
-                              duration: const Duration(milliseconds: 500),
-                              curve: Curves.easeOutCubic,
-                              tween: Tween<double>(begin: 20, end: 0),
-                              builder: (context, offsetY, child) {
-                                return Transform.translate(
-                                  offset: Offset(0, offsetY),
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 500),
-                                    opacity: 1,
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 460),
-                                child: Container(
-                                  padding: const EdgeInsets.all(22),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surface.withValues(alpha: 0.88),
-                                    borderRadius: BorderRadius.circular(28),
-                                    border: Border.all(color: AppColors.border),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.primary.withValues(alpha: 0.10),
-                                        blurRadius: 30,
-                                        spreadRadius: -10,
+                            children: [
+                              const Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: AuthLanguageSwitcher(),
+                              ),
+                              const Spacer(),
+                              const Center(
+                                child: Image(
+                                  image: AssetImage('logo.png'),
+                                  width: 200,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              TweenAnimationBuilder<double>(
+                                duration: const Duration(milliseconds: 500),
+                                curve: Curves.easeOutCubic,
+                                tween: Tween<double>(begin: 20, end: 0),
+                                builder: (context, offsetY, child) {
+                                  return Transform.translate(
+                                    offset: Offset(0, offsetY),
+                                    child: AnimatedOpacity(
+                                      duration: const Duration(
+                                        milliseconds: 500,
                                       ),
-                                    ],
+                                      opacity: 1,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 460,
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Center(
-                                        child: Text(
-                                          'Create Account',
-                                          style: TextStyle(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.w700,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(22),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surface.withValues(
+                                        alpha: 0.88,
+                                      ),
+                                      borderRadius: BorderRadius.circular(28),
+                                      border: Border.all(
+                                        color: AppColors.border,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.10,
                                           ),
+                                          blurRadius: 30,
+                                          spreadRadius: -10,
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const Center(
-                                        child: Text(
-                                          'Join SignalPro to access exclusive crypto trading signals.',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(color: AppColors.textSecondary),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 20),
-                                      const _Label('FULL NAME'),
-                                      const SizedBox(height: 6),
-                                      _Input(
-                                        controller: _fullNameController,
-                                        focusNode: _fullNameFocus,
-                                        prefix: Icons.person_outline_rounded,
-                                        hint: 'Your full name',
-                                        textInputAction: TextInputAction.next,
-                                        onSubmitted: (_) => _emailFocus.requestFocus(),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const _Label('EMAIL ADDRESS'),
-                                      const SizedBox(height: 6),
-                                      _Input(
-                                        controller: _emailController,
-                                        focusNode: _emailFocus,
-                                        prefix: Icons.mail_outline_rounded,
-                                        hint: 'name@company.com',
-                                        keyboardType: TextInputType.emailAddress,
-                                        textInputAction: TextInputAction.next,
-                                        onSubmitted: (_) => _passwordFocus.requestFocus(),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const _Label('SECURE PASSWORD'),
-                                      const SizedBox(height: 6),
-                                      _Input(
-                                        controller: _passwordController,
-                                        focusNode: _passwordFocus,
-                                        prefix: Icons.lock_outline_rounded,
-                                        hint: '••••••••',
-                                        textInputAction: TextInputAction.next,
-                                        obscureText: _obscurePassword,
-                                        onSubmitted: (_) => _confirmFocus.requestFocus(),
-                                        suffix: IconButton(
-                                          onPressed: () {
-                                            setState(() => _obscurePassword = !_obscurePassword);
-                                          },
-                                          splashRadius: 18,
-                                          icon: AnimatedSwitcher(
-                                            duration: const Duration(milliseconds: 180),
-                                            transitionBuilder: (child, animation) =>
-                                                FadeTransition(opacity: animation, child: child),
-                                            child: Icon(
-                                              _obscurePassword
-                                                  ? Icons.visibility_outlined
-                                                  : Icons.visibility_off_outlined,
-                                              key: ValueKey<bool>(_obscurePassword),
-                                              size: 20,
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Center(
+                                          child: Text(
+                                            l10n.tr('Create Account'),
+                                            style: const TextStyle(
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.w700,
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const _Label('CONFIRM PASSWORD'),
-                                      const SizedBox(height: 6),
-                                      _Input(
-                                        controller: _confirmPasswordController,
-                                        focusNode: _confirmFocus,
-                                        prefix: Icons.verified_user_outlined,
-                                        hint: '••••••••',
-                                        textInputAction: TextInputAction.next,
-                                        obscureText: _obscureConfirm,
-                                        onSubmitted: (_) => _inviteFocus.requestFocus(),
-                                        suffix: IconButton(
-                                          onPressed: () {
-                                            setState(() => _obscureConfirm = !_obscureConfirm);
-                                          },
-                                          splashRadius: 18,
-                                          icon: AnimatedSwitcher(
-                                            duration: const Duration(milliseconds: 180),
-                                            transitionBuilder: (child, animation) =>
-                                                FadeTransition(opacity: animation, child: child),
-                                            child: Icon(
-                                              _obscureConfirm
-                                                  ? Icons.visibility_outlined
-                                                  : Icons.visibility_off_outlined,
-                                              key: ValueKey<bool>(_obscureConfirm),
-                                              size: 20,
+                                        const SizedBox(height: 8),
+                                        Center(
+                                          child: Text(
+                                            l10n.tr(
+                                              'Join GoldX to access exclusive crypto trading signals.',
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              color: AppColors.textSecondary,
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const _Label('INVITE CODE (REQUIRED)'),
-                                      const SizedBox(height: 6),
-                                      _Input(
-                                        controller: _inviteController,
-                                        focusNode: _inviteFocus,
-                                        prefix: Icons.confirmation_number_outlined,
-                                        hint: 'SIG-XXXX-XXXX',
-                                        textInputAction: TextInputAction.done,
-                                        onSubmitted: (_) => _submit(),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      InkWell(
-                                        onTap: () => setState(() => _acceptTerms = !_acceptTerms),
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Row(
-                                          children: [
-                                            AnimatedContainer(
-                                              duration: const Duration(milliseconds: 160),
-                                              width: 18,
-                                              height: 18,
-                                              decoration: BoxDecoration(
-                                                borderRadius: BorderRadius.circular(5),
-                                                color: _acceptTerms
-                                                    ? AppColors.primary
-                                                    : Colors.transparent,
-                                                border: Border.all(
+                                        const SizedBox(height: 20),
+                                        _Label(l10n.tr('FULL NAME')),
+                                        const SizedBox(height: 6),
+                                        _Input(
+                                          controller: _fullNameController,
+                                          focusNode: _fullNameFocus,
+                                          prefix: Icons.person_outline_rounded,
+                                          hint: l10n.tr('Your full name'),
+                                          textInputAction: TextInputAction.next,
+                                          onSubmitted: (_) =>
+                                              _emailFocus.requestFocus(),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _Label(l10n.tr('EMAIL ADDRESS')),
+                                        const SizedBox(height: 6),
+                                        _Input(
+                                          controller: _emailController,
+                                          focusNode: _emailFocus,
+                                          prefix: Icons.mail_outline_rounded,
+                                          hint: l10n.tr('name@company.com'),
+                                          keyboardType:
+                                              TextInputType.emailAddress,
+                                          textInputAction: TextInputAction.next,
+                                          onSubmitted: (_) =>
+                                              _passwordFocus.requestFocus(),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _Label(l10n.tr('SECURE PASSWORD')),
+                                        const SizedBox(height: 6),
+                                        _Input(
+                                          controller: _passwordController,
+                                          focusNode: _passwordFocus,
+                                          prefix: Icons.lock_outline_rounded,
+                                          hint: '••••••••',
+                                          textInputAction: TextInputAction.next,
+                                          obscureText: _obscurePassword,
+                                          onSubmitted: (_) =>
+                                              _confirmFocus.requestFocus(),
+                                          suffix: IconButton(
+                                            onPressed: () {
+                                              setState(
+                                                () => _obscurePassword =
+                                                    !_obscurePassword,
+                                              );
+                                            },
+                                            splashRadius: 18,
+                                            icon: AnimatedSwitcher(
+                                              duration: const Duration(
+                                                milliseconds: 180,
+                                              ),
+                                              transitionBuilder:
+                                                  (child, animation) =>
+                                                      FadeTransition(
+                                                        opacity: animation,
+                                                        child: child,
+                                                      ),
+                                              child: Icon(
+                                                _obscurePassword
+                                                    ? Icons.visibility_outlined
+                                                    : Icons
+                                                          .visibility_off_outlined,
+                                                key: ValueKey<bool>(
+                                                  _obscurePassword,
+                                                ),
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _Label(l10n.tr('CONFIRM PASSWORD')),
+                                        const SizedBox(height: 6),
+                                        _Input(
+                                          controller:
+                                              _confirmPasswordController,
+                                          focusNode: _confirmFocus,
+                                          prefix: Icons.verified_user_outlined,
+                                          hint: '••••••••',
+                                          textInputAction: TextInputAction.next,
+                                          obscureText: _obscureConfirm,
+                                          onSubmitted: (_) =>
+                                              _inviteFocus.requestFocus(),
+                                          suffix: IconButton(
+                                            onPressed: () {
+                                              setState(
+                                                () => _obscureConfirm =
+                                                    !_obscureConfirm,
+                                              );
+                                            },
+                                            splashRadius: 18,
+                                            icon: AnimatedSwitcher(
+                                              duration: const Duration(
+                                                milliseconds: 180,
+                                              ),
+                                              transitionBuilder:
+                                                  (child, animation) =>
+                                                      FadeTransition(
+                                                        opacity: animation,
+                                                        child: child,
+                                                      ),
+                                              child: Icon(
+                                                _obscureConfirm
+                                                    ? Icons.visibility_outlined
+                                                    : Icons
+                                                          .visibility_off_outlined,
+                                                key: ValueKey<bool>(
+                                                  _obscureConfirm,
+                                                ),
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _Label(
+                                          l10n.tr('INVITE CODE (REQUIRED)'),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        _Input(
+                                          controller: _inviteController,
+                                          focusNode: _inviteFocus,
+                                          prefix: Icons
+                                              .confirmation_number_outlined,
+                                          hint: l10n.tr('XXXXXXXX'),
+                                          textInputAction: TextInputAction.done,
+                                          onSubmitted: (_) => _submit(),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        InkWell(
+                                          onTap: () => setState(
+                                            () => _acceptTerms = !_acceptTerms,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              AnimatedContainer(
+                                                duration: const Duration(
+                                                  milliseconds: 160,
+                                                ),
+                                                width: 18,
+                                                height: 18,
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(5),
                                                   color: _acceptTerms
                                                       ? AppColors.primary
-                                                      : AppColors.textMuted,
+                                                      : Colors.transparent,
+                                                  border: Border.all(
+                                                    color: _acceptTerms
+                                                        ? AppColors.primary
+                                                        : AppColors.textMuted,
+                                                  ),
+                                                ),
+                                                child: _acceptTerms
+                                                    ? const Icon(
+                                                        Icons.check_rounded,
+                                                        size: 14,
+                                                        color: AppColors
+                                                            .background,
+                                                      )
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  l10n.tr(
+                                                    'I agree to the Terms of Service and Privacy Policy.',
+                                                  ),
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
                                                 ),
                                               ),
-                                              child: _acceptTerms
-                                                  ? const Icon(
-                                                      Icons.check_rounded,
-                                                      size: 14,
-                                                      color: AppColors.background,
-                                                    )
-                                                  : null,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            const Expanded(
-                                              child: Text(
-                                                'I agree to the Terms of Service and Privacy Policy.',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppColors.textSecondary,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      _AnimatedRegisterButton(
-                                        onPressed: _submit,
-                                        isLoading: _isSubmitting,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Center(
-                                        child: TextButton(
-                                          onPressed: _isSubmitting ? null : widget.onLoginTap,
-                                          child: const Text(
-                                            'Already have an account? Login',
-                                            style: TextStyle(color: AppColors.textSecondary),
+                                            ],
                                           ),
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(height: 16),
+                                        _AnimatedRegisterButton(
+                                          onPressed: _submit,
+                                          isLoading: _isSubmitting,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Center(
+                                          child: TextButton(
+                                            onPressed: _isSubmitting
+                                                ? null
+                                                : widget.onLoginTap,
+                                            child: Text(
+                                              l10n.tr(
+                                                'Already have an account? Login',
+                                              ),
+                                              style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const Spacer(),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _Foot(
-                                  text:
-                                      '© ${DateTime.now().year} SignalPro. All rights reserved.',
-                                ),
-                              ],
-                            ),
-                          ],
+                              const Spacer(),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _Foot(
+                                    text: l10n.tr(
+                                      '\u00A9 {year} GoldX. All rights reserved.',
+                                      params: <String, String>{
+                                        'year': DateTime.now().year.toString(),
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   );
                 },
               ),
@@ -513,13 +614,17 @@ class _Input extends StatelessWidget {
 }
 
 class _AnimatedRegisterButton extends StatefulWidget {
-  const _AnimatedRegisterButton({required this.onPressed, required this.isLoading});
+  const _AnimatedRegisterButton({
+    required this.onPressed,
+    required this.isLoading,
+  });
 
   final Future<void> Function() onPressed;
   final bool isLoading;
 
   @override
-  State<_AnimatedRegisterButton> createState() => _AnimatedRegisterButtonState();
+  State<_AnimatedRegisterButton> createState() =>
+      _AnimatedRegisterButtonState();
 }
 
 class _AnimatedRegisterButtonState extends State<_AnimatedRegisterButton> {
@@ -540,6 +645,8 @@ class _AnimatedRegisterButtonState extends State<_AnimatedRegisterButton> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return GestureDetector(
       onTapDown: widget.isLoading ? null : _onTapDown,
       onTapUp: widget.isLoading ? null : _onTapUp,
@@ -572,23 +679,24 @@ class _AnimatedRegisterButtonState extends State<_AnimatedRegisterButton> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(AppColors.background),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.background,
+                      ),
                     ),
                   )
-                : const Row(
+                : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Create Account',
-                        style: TextStyle(
+                        l10n.tr('Create Account'),
+                        style: const TextStyle(
                           color: AppColors.background,
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
                         ),
                       ),
-                      SizedBox(width: 8),
-                      Icon(
+                      const SizedBox(width: 8),
+                      const Icon(
                         Icons.arrow_forward_rounded,
                         color: AppColors.background,
                         size: 18,

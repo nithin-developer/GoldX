@@ -345,6 +345,13 @@ def _ensure_signal_public_ids(sync_conn) -> None:
     if "public_id" not in signal_columns:
         sync_conn.execute(text("ALTER TABLE signals ADD COLUMN public_id VARCHAR(36)"))
 
+    if "vip_only" not in signal_columns:
+        sync_conn.execute(
+            text("ALTER TABLE signals ADD COLUMN vip_only BOOLEAN DEFAULT FALSE")
+        )
+
+    sync_conn.execute(text("UPDATE signals SET vip_only = FALSE WHERE vip_only IS NULL"))
+
     rows = sync_conn.execute(
         text("SELECT id FROM signals WHERE public_id IS NULL OR public_id = ''")
     ).fetchall()

@@ -3,6 +3,6 @@ import 'package:signalpro/app/app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SignalProApp());
+  runApp(const GoldXApp());
 }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/models/home_dashboard.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/app_data_api.dart';
@@ -71,6 +72,9 @@ class _HomePageState extends State<HomePage> {
   bool _isDisposed = false;
   bool _isActiveInTree = true;
   String? _streamError;
+
+  String get _streamReconnectMessage =>
+      context.l10n.tr('Live market feed disconnected. Reconnecting...');
 
   @override
   void initState() {
@@ -181,7 +185,7 @@ class _HomePageState extends State<HomePage> {
         }
 
         setState(() {
-          _streamError = 'Live market feed disconnected. Reconnecting...';
+          _streamError = _streamReconnectMessage;
         });
 
         _scheduleReconnect();
@@ -192,7 +196,7 @@ class _HomePageState extends State<HomePage> {
         }
 
         setState(() {
-          _streamError = 'Live market feed disconnected. Reconnecting...';
+          _streamError = _streamReconnectMessage;
         });
 
         _scheduleReconnect();
@@ -225,6 +229,7 @@ class _HomePageState extends State<HomePage> {
   String _buildAlertText(
     List<HomeAnnouncement> announcements,
     List<String> activeSignalAlerts,
+    AppLocalizations l10n,
   ) {
     final announcementSegments = announcements
         .map((item) {
@@ -251,7 +256,9 @@ class _HomePageState extends State<HomePage> {
     final allSegments = <String>[...announcementSegments, ...signalSegments];
 
     if (allSegments.isEmpty) {
-      return 'Market Alert: BTC above \$72k | New ETH signals live | Refer and earn rewards';
+      return l10n.tr(
+        'Market Alert: BTC above \$72k | New ETH signals live | Refer and earn rewards',
+      );
     }
 
     return allSegments.join('  |  ');
@@ -259,6 +266,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return FutureBuilder<HomeDashboardData>(
       future: _future,
       builder: (context, snapshot) {
@@ -276,13 +285,13 @@ class _HomePageState extends State<HomePage> {
         if (snapshot.hasError && data == null) {
           final message = snapshot.error is ApiException
               ? (snapshot.error as ApiException).message
-              : 'Unable to load dashboard data.';
+              : l10n.tr('Unable to load dashboard data.');
           return _HomeErrorState(message: message, onRetry: _refresh);
         }
 
         if (data == null) {
           return _HomeErrorState(
-            message: 'Dashboard data is unavailable.',
+            message: l10n.tr('Dashboard data is unavailable.'),
             onRetry: _refresh,
           );
         }
@@ -313,6 +322,7 @@ class _HomePageState extends State<HomePage> {
                   text: _buildAlertText(
                     data.announcements,
                     data.activeSignalAlerts,
+                    l10n,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -323,7 +333,7 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: _QuickAction(
                         icon: Icons.south_west_rounded,
-                        label: 'Deposit',
+                        label: l10n.tr('Deposit'),
                         iconColor: AppColors.secondary,
                         onTap: widget.onDeposit,
                       ),
@@ -332,7 +342,7 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: _QuickAction(
                         icon: Icons.north_east_rounded,
-                        label: 'Withdraw',
+                        label: l10n.tr('Withdraw'),
                         iconColor: AppColors.highlight,
                         onTap: widget.onWithdraw,
                       ),
@@ -341,7 +351,7 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: _QuickAction(
                         icon: Icons.support_agent_rounded,
-                        label: 'Support',
+                        label: l10n.tr('Support'),
                         iconColor: AppColors.secondary,
                         onTap: widget.onSupport,
                       ),
@@ -349,9 +359,9 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                const _SectionTitle(
-                  title: 'Market Snapshot',
-                  actionText: 'LIVE',
+                _SectionTitle(
+                  title: l10n.tr('Market Snapshot'),
+                  actionText: l10n.tr('LIVE'),
                 ),
                 const SizedBox(height: 10),
                 _SnapshotScroller(
@@ -372,7 +382,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                const _SectionTitle(title: 'Recent Activity'),
+                _SectionTitle(title: l10n.tr('Recent Activity')),
                 const SizedBox(height: 10),
                 _RecentActivityCard(activities: activities),
               ],
@@ -397,6 +407,8 @@ class _HomeLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -424,7 +436,7 @@ class _HomeLoadingView extends StatelessWidget {
               Expanded(
                 child: _QuickAction(
                   icon: Icons.south_west_rounded,
-                  label: 'Deposit',
+                  label: l10n.tr('Deposit'),
                   iconColor: AppColors.secondary,
                   onTap: onDeposit,
                 ),
@@ -433,7 +445,7 @@ class _HomeLoadingView extends StatelessWidget {
               Expanded(
                 child: _QuickAction(
                   icon: Icons.north_east_rounded,
-                  label: 'Withdraw',
+                  label: l10n.tr('Withdraw'),
                   iconColor: AppColors.highlight,
                   onTap: onWithdraw,
                 ),
@@ -442,7 +454,7 @@ class _HomeLoadingView extends StatelessWidget {
               Expanded(
                 child: _QuickAction(
                   icon: Icons.support_agent_rounded,
-                  label: 'Support',
+                  label: l10n.tr('Support'),
                   iconColor: AppColors.secondary,
                   onTap: onSupport,
                 ),
@@ -450,11 +462,14 @@ class _HomeLoadingView extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          const _SectionTitle(title: 'Market Snapshot', actionText: 'LIVE'),
+          _SectionTitle(
+            title: l10n.tr('Market Snapshot'),
+            actionText: l10n.tr('LIVE'),
+          ),
           const SizedBox(height: 10),
           const _SnapshotSkeletons(),
           const SizedBox(height: 20),
-          const _SectionTitle(title: 'Recent Activity'),
+          _SectionTitle(title: l10n.tr('Recent Activity')),
           const SizedBox(height: 10),
           const SkeletonBox(height: 210, radius: 22),
         ],
@@ -471,6 +486,8 @@ class _HomeErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -484,9 +501,9 @@ class _HomeErrorState extends StatelessWidget {
                 size: 34,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Unable to load home dashboard',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                l10n.tr('Unable to load home dashboard'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
@@ -497,7 +514,7 @@ class _HomeErrorState extends StatelessWidget {
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => onRetry(),
-                child: const Text('Retry'),
+                child: Text(l10n.tr('Retry')),
               ),
             ],
           ),
@@ -564,7 +581,7 @@ class _MarqueeTextState extends State<_MarqueeText>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 18),
+      duration: const Duration(seconds: 50),
     )..repeat();
   }
 
@@ -616,6 +633,7 @@ class _BalanceHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final balance = _MoneyFormatters.currency(data.balance);
     final todayProfit = _MoneyFormatters.signed(data.todayProfit);
 
@@ -647,9 +665,9 @@ class _BalanceHeroCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'TOTAL BALANCE',
-                        style: TextStyle(
+                      Text(
+                        l10n.tr('TOTAL BALANCE'),
+                        style: const TextStyle(
                           fontSize: 10,
                           fontFamily: 'Inter',
                           fontWeight: FontWeight.w800,
@@ -684,9 +702,9 @@ class _BalanceHeroCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'TODAY\'S PROFIT',
-                        style: TextStyle(
+                      Text(
+                        l10n.tr("TODAY'S PROFIT"),
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1,
@@ -728,6 +746,8 @@ class _PerformanceChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -744,7 +764,10 @@ class _PerformanceChip extends StatelessWidget {
               Icon(Icons.verified_user, size: 14, color: AppColors.secondary),
               const SizedBox(width: 4),
               Text(
-                'VIP $activeSignals Level',
+                l10n.tr(
+                  'VIP {level} Level',
+                  params: <String, String>{'level': activeSignals.toString()},
+                ),
                 style: const TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -764,15 +787,19 @@ class _AssetCircleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final overlapOffset = context.l10n.isArabic
+        ? 8.0
+        : -8.0;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         const _AssetCircle(icon: Icons.currency_bitcoin_rounded),
         Transform.translate(
-          offset: const Offset(-8, 0),
+          offset: Offset(overlapOffset, 0),
           child: const _AssetCircle(icon: Icons.eco_rounded),
         ),
-      ],
+      ], 
     );
   }
 }
@@ -916,6 +943,8 @@ class _SnapshotScroller extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return SizedBox(
       height: 132,
       child: ListView.separated(
@@ -929,7 +958,7 @@ class _SnapshotScroller extends StatelessWidget {
           final change = dailyChangePercent[coin.pair];
 
           return _SnapshotAssetCard(
-            asset: coin.label,
+            asset: l10n.tr(coin.label),
             logoAsset: coin.logoAsset,
             price: formatPrice(price),
             gain: _MoneyFormatters.percent(change),
@@ -1058,14 +1087,18 @@ class _RecentActivityCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (activities.isEmpty) {
+      final l10n = context.l10n;
+
       return GlassCard(
         borderRadius: 22,
         borderColor: AppColors.outlineVariant,
-        child: const Padding(
-          padding: EdgeInsets.all(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Text(
-            'No recent activity yet. Your latest deposits, withdrawals, signals, and referrals will appear here.',
-            style: TextStyle(
+            l10n.tr(
+              'No recent activity yet. Your latest deposits, withdrawals, signals, and referrals will appear here.',
+            ),
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w600,

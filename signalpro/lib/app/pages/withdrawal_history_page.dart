@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/pages/withdrawal_detail_page.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
@@ -65,9 +66,11 @@ class _WithdrawalHistoryPageState extends State<WithdrawalHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Withdrawal History'),
+        title: Text(l10n.tr('Withdrawal History')),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -82,7 +85,7 @@ class _WithdrawalHistoryPageState extends State<WithdrawalHistoryPage> {
           if (snapshot.hasError) {
             final message = snapshot.error is ApiException
                 ? (snapshot.error as ApiException).message
-                : 'Unable to load withdrawal history.';
+                : l10n.tr('Unable to load withdrawal history.');
             return _HistoryErrorState(message: message, onRetry: _refresh);
           }
 
@@ -104,10 +107,11 @@ class _WithdrawalHistoryPageState extends State<WithdrawalHistoryPage> {
                 ),
                 const SizedBox(height: 14),
                 if (items.isEmpty)
-                  const EmptyStateIllustration(
-                    title: 'No Withdrawal Records',
-                    subtitle:
-                        'Your submitted and processed withdrawals will appear here.',
+                  EmptyStateIllustration(
+                    title: l10n.tr('No Withdrawal Records'),
+                    subtitle: l10n.tr(
+                      'Your submitted and processed withdrawals will appear here.',
+                    ),
                     icon: Icons.outbox_outlined,
                   )
                 else
@@ -151,6 +155,8 @@ class _WithdrawalHistorySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     final totalAmount = entries.fold<double>(
       0,
       (sum, item) => sum + item.amount,
@@ -166,9 +172,9 @@ class _WithdrawalHistorySummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'WITHDRAWAL ANALYTICS',
-            style: TextStyle(
+          Text(
+            l10n.tr('WITHDRAWAL ANALYTICS'),
+            style: const TextStyle(
               fontSize: 11,
               letterSpacing: 1.2,
               color: AppColors.textSecondary,
@@ -185,16 +191,16 @@ class _WithdrawalHistorySummary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Total withdrawal volume for this filter',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          Text(
+            l10n.tr('Total withdrawal volume for this filter'),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
                 child: _MetricPill(
-                  label: 'Pending',
+                  label: l10n.tr('Pending'),
                   value: pendingCount.toString(),
                   color: const Color(0xFFB45309),
                   icon: Icons.pending_rounded,
@@ -203,7 +209,7 @@ class _WithdrawalHistorySummary extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _MetricPill(
-                  label: 'Approved',
+                  label: l10n.tr('Approved'),
                   value: approvedCount.toString(),
                   color: AppColors.success,
                   icon: Icons.task_alt_rounded,
@@ -286,11 +292,13 @@ class _StatusFilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const filters = <MapEntry<String, String>>[
-      MapEntry('all', 'All'),
-      MapEntry('pending', 'Pending'),
-      MapEntry('approved', 'Approved'),
-      MapEntry('rejected', 'Rejected'),
+    final l10n = context.l10n;
+
+    final filters = <MapEntry<String, String>>[
+      MapEntry('all', l10n.tr('All')),
+      MapEntry('pending', l10n.tr('Pending')),
+      MapEntry('approved', l10n.tr('Approved')),
+      MapEntry('rejected', l10n.tr('Rejected')),
     ];
 
     return Wrap(
@@ -365,7 +373,8 @@ class _WithdrawalHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _statusVisual(item.status);
+    final l10n = context.l10n;
+    final status = _statusVisual(item.status, l10n);
 
     return GlassCard(
       onTap: onTap,
@@ -384,10 +393,10 @@ class _WithdrawalHistoryCard extends StatelessWidget {
                 child: Icon(status.icon, color: status.foreground, size: 18),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Withdrawal Request',
-                  style: TextStyle(
+                  l10n.tr('Withdrawal Request'),
+                  style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
@@ -416,8 +425,11 @@ class _WithdrawalHistoryCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             item.walletAddress?.isNotEmpty == true
-                ? 'Destination: ${item.walletAddress}'
-                : 'Destination: Not provided',
+                ? l10n.tr(
+                    'Destination: {value}',
+                    params: <String, String>{'value': item.walletAddress!},
+                  )
+                : l10n.tr('Destination: Not provided'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -430,7 +442,10 @@ class _WithdrawalHistoryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'ID: ${item.id}',
+                  l10n.tr(
+                    'ID: {id}',
+                    params: <String, String>{'id': item.id},
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -484,6 +499,8 @@ class _HistoryErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -497,9 +514,9 @@ class _HistoryErrorState extends StatelessWidget {
                 size: 34,
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Unable to load withdrawals',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                l10n.tr('Unable to load withdrawals'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
@@ -508,7 +525,7 @@ class _HistoryErrorState extends StatelessWidget {
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 14),
-              PrimaryButton(text: 'Retry', onPressed: onRetry),
+              PrimaryButton(text: l10n.tr('Retry'), onPressed: onRetry),
             ],
           ),
         ),
@@ -531,32 +548,32 @@ class _StatusVisual {
   final Color foreground;
 }
 
-_StatusVisual _statusVisual(String status) {
+_StatusVisual _statusVisual(String status, AppLocalizations l10n) {
   switch (status) {
     case 'approved':
-      return const _StatusVisual(
-        label: 'Approved',
+      return _StatusVisual(
+        label: l10n.tr('Approved'),
         icon: Icons.verified_rounded,
         background: Color(0x1F22C55E),
         foreground: AppColors.success,
       );
     case 'rejected':
-      return const _StatusVisual(
-        label: 'Rejected',
+      return _StatusVisual(
+        label: l10n.tr('Rejected'),
         icon: Icons.cancel_rounded,
         background: Color(0x1FEF4444),
         foreground: AppColors.danger,
       );
     case 'pending':
-      return const _StatusVisual(
-        label: 'Pending',
+      return _StatusVisual(
+        label: l10n.tr('Pending'),
         icon: Icons.schedule_rounded,
         background: Color(0x1FB45309),
         foreground: Color(0xFFB45309),
       );
     default:
-      return const _StatusVisual(
-        label: 'Unknown',
+      return _StatusVisual(
+        label: l10n.tr('Unknown'),
         icon: Icons.help_outline_rounded,
         background: Color(0x1F4A5568),
         foreground: AppColors.textSecondary,

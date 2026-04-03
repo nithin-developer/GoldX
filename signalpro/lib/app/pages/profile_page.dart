@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/models/user_profile.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/app_data_api.dart';
@@ -11,6 +12,7 @@ import 'package:signalpro/app/widgets/primary_button.dart';
 import 'package:signalpro/app/pages/deposit_history_page.dart';
 import 'package:signalpro/app/pages/withdrawal_history_page.dart';
 import 'package:signalpro/app/pages/withdrawal_password_page.dart';
+import 'package:signalpro/app/pages/change_password_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -67,6 +69,12 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  void _openChangePasswordPage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ChangePasswordPage()));
+  }
+
   void _openDepositHistoryPage() {
     Navigator.of(
       context,
@@ -81,6 +89,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return FutureBuilder<UserProfile>(
       future: _future,
       builder: (context, snapshot) {
@@ -92,22 +102,24 @@ class _ProfilePageState extends State<ProfilePage> {
         if (snapshot.hasError && widget.user == null) {
           final message = snapshot.error is ApiException
               ? (snapshot.error as ApiException).message
-              : 'Unable to load profile.';
+              : l10n.tr('Unable to load profile.');
           return _ErrorState(message: message, onRetry: _refresh);
         }
 
         final user = snapshot.data ?? widget.user;
         if (user == null) {
-          return const EmptyStateIllustration(
-            title: 'No Profile Data Found',
-            subtitle: 'Please refresh or login again to load your profile.',
+          return EmptyStateIllustration(
+            title: l10n.tr('No Profile Data Found'),
+            subtitle: l10n.tr(
+              'Please refresh or login again to load your profile.',
+            ),
             icon: Icons.person_off_outlined,
           );
         }
 
         final displayName = user.fullName?.trim().isNotEmpty == true
             ? user.fullName!.trim()
-            : 'SignalPro User';
+            : l10n.tr('GoldX User');
         final displayEmail = user.email;
         final displayId = user.id.toString();
         final joinedAt = DateFormat(
@@ -145,16 +157,32 @@ class _ProfilePageState extends State<ProfilePage> {
                       runSpacing: 8,
                       alignment: WrapAlignment.center,
                       children: [
-                        _InfoChip(label: 'VIP ${user.vipLevel}'),
-                        _InfoChip(label: user.isActive ? 'Active' : 'Inactive'),
-                        _InfoChip(label: 'Joined $joinedAt'),
+                        _InfoChip(
+                          label: l10n.tr(
+                            'VIP {level}',
+                            params: <String, String>{
+                              'level': user.vipLevel.toString(),
+                            },
+                          ),
+                        ),
+                        _InfoChip(
+                          label: user.isActive
+                              ? l10n.tr('Active')
+                              : l10n.tr('Inactive'),
+                        ),
+                        _InfoChip(
+                          label: l10n.tr(
+                            'Joined {date}',
+                            params: <String, String>{'date': joinedAt},
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
-              const _SectionTag('ACCOUNT'),
+              _SectionTag(l10n.tr('ACCOUNT')),
               const SizedBox(height: 8),
               // _TileCard(
               //   title: 'Invite Code',
@@ -171,41 +199,52 @@ class _ProfilePageState extends State<ProfilePage> {
               // ),
               // const SizedBox(height: 10),
               _TileCard(
-                title: 'Deposit History',
-                subtitle: 'Track requests, approvals, and deposit details',
+                title: l10n.tr('Deposit History'),
+                subtitle: l10n.tr(
+                  'Track requests, approvals, and deposit details',
+                ),
                 icon: Icons.history_rounded,
                 onTap: _openDepositHistoryPage,
               ),
               const SizedBox(height: 10),
               _TileCard(
-                title: 'Withdrawal History',
-                subtitle: 'Monitor payouts, status updates, and notes',
+                title: l10n.tr('Withdrawal History'),
+                subtitle: l10n.tr('Monitor payouts, status updates, and notes'),
                 icon: Icons.outbox_outlined,
                 onTap: _openWithdrawalHistoryPage,
               ),
               const SizedBox(height: 10),
               _TileCard(
-                title: 'Withdrawal Password',
+                title: l10n.tr('Withdrawal Password'),
                 subtitle: user.hasWithdrawalPassword
-                    ? 'Configured'
-                    : 'Not configured',
+                    ? l10n.tr('Configured')
+                    : l10n.tr('Not configured'),
                 icon: Icons.password_rounded,
                 onTap: () => _openWithdrawalPasswordPage(user),
               ),
               const SizedBox(height: 10),
-              const _SectionTag('SUPPORT'),
+              _TileCard(
+                title: l10n.tr('Login Password'),
+                subtitle: l10n.tr(
+                  'Change your account login password securely',
+                ),
+                icon: Icons.lock_outline_rounded,
+                onTap: _openChangePasswordPage,
+              ),
+              const SizedBox(height: 10),
+              _SectionTag(l10n.tr('SUPPORT')),
               const SizedBox(height: 8),
               _TileCard(
-                title: 'Customer Support',
-                subtitle: 'Open external support link',
+                title: l10n.tr('Customer Support'),
+                subtitle: l10n.tr('Open external support link'),
                 icon: Icons.forum_outlined,
                 // ontap opens external link
                 onTap: widget.onSupport,
               ),
               const SizedBox(height: 10),
               _TileCard(
-                title: 'Logout',
-                subtitle: 'End active sessions',
+                title: l10n.tr('Logout'),
+                subtitle: l10n.tr('End active sessions'),
                 icon: Icons.logout_rounded,
                 danger: true,
                 onTap: widget.onLogout,
@@ -329,6 +368,8 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -342,9 +383,9 @@ class _ErrorState extends StatelessWidget {
                 size: 34,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Unable to load profile',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              Text(
+                l10n.tr('Unable to load profile'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
@@ -353,7 +394,7 @@ class _ErrorState extends StatelessWidget {
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 12),
-              PrimaryButton(text: 'Retry', onPressed: onRetry),
+              PrimaryButton(text: l10n.tr('Retry'), onPressed: onRetry),
             ],
           ),
         ),

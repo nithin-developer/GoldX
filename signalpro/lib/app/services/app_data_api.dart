@@ -177,9 +177,13 @@ class AppDataApi {
   Future<List<SignalFeedItem>> getSignals({
     String? status,
     bool forceRefresh = false,
+    int skip = 0,
+    int limit = 100,
+    bool includeAllStatuses = false,
   }) async {
     final key = _signalsCacheKey(status);
-    if (!forceRefresh) {
+    final canUseCache = !includeAllStatuses && skip == 0 && limit == 100;
+    if (!forceRefresh && canUseCache) {
       final cached = _signalCache[key];
       if (cached != null) {
         return List<SignalFeedItem>.from(cached);
@@ -190,11 +194,14 @@ class AppDataApi {
       final normalizedStatus = status?.trim();
       final hasStatusFilter =
           normalizedStatus != null && normalizedStatus.isNotEmpty;
+      final useAllEndpoint =
+          includeAllStatuses || hasStatusFilter || skip > 0 || limit != 100;
       final response = await _dio.get<List<dynamic>>(
-        hasStatusFilter ? '/signals/all' : '/signals',
+        useAllEndpoint ? '/signals/all' : '/signals',
         queryParameters: {
-          if (hasStatusFilter) 'status': normalizedStatus,
-          'limit': 100,
+          if (useAllEndpoint && hasStatusFilter) 'status': normalizedStatus,
+          if (useAllEndpoint) 'skip': skip,
+          'limit': limit,
           if (forceRefresh) '_ts': DateTime.now().millisecondsSinceEpoch,
         },
       );
@@ -205,7 +212,10 @@ class AppDataApi {
           .map(SignalFeedItem.fromJson)
           .toList();
 
-      _signalCache[key] = mapped;
+      if (canUseCache) {
+        _signalCache[key] = mapped;
+      }
+
       return List<SignalFeedItem>.from(mapped);
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -217,7 +227,8 @@ class AppDataApi {
     int skip = 0,
     int limit = 100,
   }) async {
-    if (!forceRefresh && _signalHistoryCache != null) {
+    final canUseCache = skip == 0 && limit == 100;
+    if (!forceRefresh && canUseCache && _signalHistoryCache != null) {
       return List<SignalHistoryItem>.from(_signalHistoryCache!);
     }
 
@@ -237,7 +248,10 @@ class AppDataApi {
           .map(SignalHistoryItem.fromJson)
           .toList();
 
-      _signalHistoryCache = mapped;
+      if (canUseCache) {
+        _signalHistoryCache = mapped;
+      }
+
       return List<SignalHistoryItem>.from(mapped);
     } on DioException catch (error) {
       throw mapDioError(error);

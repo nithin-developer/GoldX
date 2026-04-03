@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/models/signal_feed_item.dart';
 import 'package:signalpro/app/models/signal_history_item.dart';
 import 'package:signalpro/app/services/api_exception.dart';
@@ -20,14 +24,25 @@ class SignalsPage extends StatefulWidget {
 }
 
 class _SignalsPageState extends State<SignalsPage> {
+  static const int _pageSize = 10;
+
   AppDataApi? _api;
   _SignalTab? _selectedTab;
+  Timer? _expiryTicker;
 
   Future<List<SignalFeedItem>>? _activeSignalsFuture;
   Future<List<SignalHistoryItem>>? _historySignalsFuture;
 
   List<SignalFeedItem>? _cachedActiveSignals;
   List<SignalHistoryItem>? _cachedHistorySignals;
+
+  int _activeSkip = 0;
+  bool _activeHasMore = true;
+  bool _isLoadingMoreActive = false;
+
+  int _historySkip = 0;
+  bool _historyHasMore = true;
+  bool _isLoadingMoreHistory = false;
 
   _SignalTab get _currentTab => _selectedTab ?? _SignalTab.active;
 
@@ -37,16 +52,52 @@ class _SignalsPageState extends State<SignalsPage> {
   List<SignalHistoryItem> get _historyCache =>
       _cachedHistorySignals ?? const <SignalHistoryItem>[];
 
+  bool _isSignalActive(SignalFeedItem signal, {DateTime? at}) {
+    final referenceTime = at ?? DateTime.now();
+    return signal.status.toLowerCase() == 'active' &&
+        !signal.hasExpired(at: referenceTime);
+  }
+
+  bool _isPastHistoryEntry(SignalHistoryItem entry, {DateTime? at}) {
+    final referenceTime = at ?? DateTime.now();
+    final hasEnded = !referenceTime.isBefore(entry.endsAt);
+    return !entry.isActive || entry.isExpired || hasEnded;
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedTab ??= _SignalTab.active;
     _cachedActiveSignals ??= const <SignalFeedItem>[];
     _cachedHistorySignals ??= const <SignalHistoryItem>[];
+    _expiryTicker = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _expiryTicker?.cancel();
+    super.dispose();
   }
 
   Future<void> _openActivationModal(SignalFeedItem signal) async {
     if (_api == null || signal.id.isEmpty) {
+      return;
+    }
+
+    final l10n = context.l10n;
+    final isVipUser = (AuthScope.of(context).currentUser?.vipLevel ?? 0) > 0;
+    if (signal.vipOnly && !isVipUser) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.tr('This signal is available for VIP users only')),
+        ),
+      );
       return;
     }
 
@@ -63,7 +114,7 @@ class _SignalsPageState extends State<SignalsPage> {
               final code = codeController.text.trim();
               if (code.isEmpty) {
                 setDialogState(() {
-                  inlineError = 'Activation code is required';
+                  inlineError = l10n.tr('Activation code is required');
                 });
                 return;
               }
@@ -82,8 +133,8 @@ class _SignalsPageState extends State<SignalsPage> {
                 _refreshAfterActivation();
                 Navigator.of(this.context).pop();
                 ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Signal activated successfully.'),
+                  SnackBar(
+                    content: Text(l10n.tr('Signal activated successfully.')),
                   ),
                 );
               } on ApiException catch (error) {
@@ -115,27 +166,36 @@ class _SignalsPageState extends State<SignalsPage> {
                   return;
                 }
 
-                const fallbackMessage =
-                    'Unable to activate signal. Please try again.';
+                final localizedFallback = l10n.tr(
+                  'Unable to activate signal. Please try again.',
+                );
                 setDialogState(() {
                   isSubmitting = false;
-                  inlineError = fallbackMessage;
+                  inlineError = localizedFallback;
                 });
 
                 ScaffoldMessenger.of(
                   this.context,
-                ).showSnackBar(const SnackBar(content: Text(fallbackMessage)));
+                ).showSnackBar(SnackBar(content: Text(localizedFallback)));
               }
             }
 
             return AlertDialog(
-              title: Text('Activate ${signal.asset}'),
+              title: Text(
+                l10n.tr(
+                  'Activate {asset}',
+                  params: <String, String>{'asset': signal.asset},
+                ),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Enter your activation code to continue with ${signal.asset}.',
+                    l10n.tr(
+                      'Enter your activation code to continue with {asset}.',
+                      params: <String, String>{'asset': signal.asset},
+                    ),
                     style: const TextStyle(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 10),
@@ -144,7 +204,7 @@ class _SignalsPageState extends State<SignalsPage> {
                     enabled: !isSubmitting,
                     textCapitalization: TextCapitalization.characters,
                     decoration: InputDecoration(
-                      hintText: 'Enter activation code',
+                      hintText: l10n.tr('Enter activation code'),
                       errorText: inlineError,
                     ),
                   ),
@@ -155,11 +215,15 @@ class _SignalsPageState extends State<SignalsPage> {
                   onPressed: isSubmitting
                       ? null
                       : () => Navigator.of(this.context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text(l10n.tr('Cancel')),
                 ),
                 ElevatedButton(
                   onPressed: isSubmitting ? null : submit,
-                  child: Text(isSubmitting ? 'Validating...' : 'Activate'),
+                  child: Text(
+                    isSubmitting
+                        ? l10n.tr('Validating...')
+                        : l10n.tr('Activate Signal'),
+                  ),
                 ),
               ],
             );
@@ -177,11 +241,126 @@ class _SignalsPageState extends State<SignalsPage> {
     final api = _api ?? AppDataApi(dio: AuthScope.of(context).apiClient.dio);
     _api = api;
 
-    _cachedActiveSignals = api.getCachedSignals() ?? _activeCache;
-    _cachedHistorySignals = api.getCachedSignalHistory() ?? _historyCache;
+    _activeSignalsFuture ??= _loadActiveSignals(reset: true);
+    _historySignalsFuture ??= _loadHistorySignals(reset: true);
+  }
 
-    _activeSignalsFuture ??= api.getSignals();
-    _historySignalsFuture ??= api.getSignalHistory();
+  Future<List<SignalFeedItem>> _loadActiveSignals({required bool reset}) async {
+    final api = _api;
+    if (api == null) {
+      return _activeCache;
+    }
+
+    final requestSkip = reset ? 0 : _activeSkip;
+    final fetched = await api.getSignals(
+      forceRefresh: reset,
+      skip: requestSkip,
+      limit: _pageSize,
+      includeAllStatuses: true,
+    );
+    final referenceTime = DateTime.now();
+
+    final nextSignals = fetched
+        .where((signal) => _isSignalActive(signal, at: referenceTime))
+        .toList(growable: false);
+
+    final merged = reset
+        ? <SignalFeedItem>[]
+        : List<SignalFeedItem>.from(_activeCache);
+    final seenIds = merged
+        .where((item) => item.id.isNotEmpty)
+        .map((item) => item.id)
+        .toSet();
+
+    for (final signal in nextSignals) {
+      if (signal.id.isEmpty || seenIds.add(signal.id)) {
+        merged.add(signal);
+      }
+    }
+
+    _cachedActiveSignals = merged;
+    _activeSkip = requestSkip + fetched.length;
+    _activeHasMore = fetched.length == _pageSize;
+    return merged;
+  }
+
+  Future<List<SignalHistoryItem>> _loadHistorySignals({
+    required bool reset,
+  }) async {
+    final api = _api;
+    if (api == null) {
+      return _historyCache;
+    }
+
+    final requestSkip = reset ? 0 : _historySkip;
+    final fetched = await api.getSignalHistory(
+      forceRefresh: reset,
+      skip: requestSkip,
+      limit: _pageSize,
+    );
+    final referenceTime = DateTime.now();
+
+    final nextEntries = fetched
+        .where((entry) => _isPastHistoryEntry(entry, at: referenceTime))
+        .toList(growable: false);
+
+    final merged = reset
+        ? <SignalHistoryItem>[]
+        : List<SignalHistoryItem>.from(_historyCache);
+    final seenIds = merged.map((entry) => entry.id).toSet();
+
+    for (final entry in nextEntries) {
+      if (seenIds.add(entry.id)) {
+        merged.add(entry);
+      }
+    }
+
+    _cachedHistorySignals = merged;
+    _historySkip = requestSkip + fetched.length;
+    _historyHasMore = fetched.length == _pageSize;
+    return merged;
+  }
+
+  Future<void> _loadMoreActiveSignals() async {
+    if (_api == null || _isLoadingMoreActive || !_activeHasMore) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMoreActive = true;
+      _activeSignalsFuture = _loadActiveSignals(reset: false);
+    });
+
+    await _awaitSafely(_activeSignalsFuture);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMoreActive = false;
+    });
+  }
+
+  Future<void> _loadMoreHistorySignals() async {
+    if (_api == null || _isLoadingMoreHistory || !_historyHasMore) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMoreHistory = true;
+      _historySignalsFuture = _loadHistorySignals(reset: false);
+    });
+
+    await _awaitSafely(_historySignalsFuture);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMoreHistory = false;
+    });
   }
 
   Future<void> _awaitSafely<T>(Future<T>? future) async {
@@ -202,7 +381,10 @@ class _SignalsPageState extends State<SignalsPage> {
     }
 
     setState(() {
-      _activeSignalsFuture = _api!.getSignals(forceRefresh: true);
+      _activeSkip = 0;
+      _activeHasMore = true;
+      _isLoadingMoreActive = false;
+      _activeSignalsFuture = _loadActiveSignals(reset: true);
     });
 
     await _awaitSafely(_activeSignalsFuture);
@@ -214,7 +396,10 @@ class _SignalsPageState extends State<SignalsPage> {
     }
 
     setState(() {
-      _historySignalsFuture = _api!.getSignalHistory(forceRefresh: true);
+      _historySkip = 0;
+      _historyHasMore = true;
+      _isLoadingMoreHistory = false;
+      _historySignalsFuture = _loadHistorySignals(reset: true);
     });
 
     await _awaitSafely(_historySignalsFuture);
@@ -226,8 +411,15 @@ class _SignalsPageState extends State<SignalsPage> {
     }
 
     setState(() {
-      _activeSignalsFuture = _api!.getSignals(forceRefresh: true);
-      _historySignalsFuture = _api!.getSignalHistory(forceRefresh: true);
+      _activeSkip = 0;
+      _activeHasMore = true;
+      _isLoadingMoreActive = false;
+      _activeSignalsFuture = _loadActiveSignals(reset: true);
+
+      _historySkip = 0;
+      _historyHasMore = true;
+      _isLoadingMoreHistory = false;
+      _historySignalsFuture = _loadHistorySignals(reset: true);
     });
   }
 
@@ -242,6 +434,8 @@ class _SignalsPageState extends State<SignalsPage> {
   }
 
   Widget _buildActiveSignalsTab() {
+    final l10n = context.l10n;
+
     return FutureBuilder<List<SignalFeedItem>>(
       future: _activeSignalsFuture,
       builder: (context, snapshot) {
@@ -254,7 +448,10 @@ class _SignalsPageState extends State<SignalsPage> {
               signals: activeCache,
               onActivateSignal: _openActivationModal,
               onRefresh: _refreshActiveSignals,
-              showRefreshingBanner: true,
+              onLoadMore: _loadMoreActiveSignals,
+              hasMore: _activeHasMore,
+              isLoadingMore: _isLoadingMoreActive,
+              showRefreshingBanner: !_isLoadingMoreActive,
             );
           }
 
@@ -264,33 +461,43 @@ class _SignalsPageState extends State<SignalsPage> {
         if (snapshot.hasError) {
           final message = snapshot.error is ApiException
               ? (snapshot.error as ApiException).message
-              : 'Failed to load active signals.';
+              : l10n.tr('Failed to load active signals.');
 
           if (canUseCache) {
             return _ActiveSignalsList(
               signals: activeCache,
               onActivateSignal: _openActivationModal,
               onRefresh: _refreshActiveSignals,
-              topMessage: 'Showing cached signals. $message',
+              onLoadMore: _loadMoreActiveSignals,
+              hasMore: _activeHasMore,
+              isLoadingMore: _isLoadingMoreActive,
+              topMessage: l10n.tr(
+                'Showing cached signals. {message}',
+                params: <String, String>{'message': message},
+              ),
             );
           }
 
           return _ErrorState(
-            title: 'Unable to load active signals',
+            title: l10n.tr('Unable to load active signals'),
             message: message,
             onRetry: _refreshActiveSignals,
           );
         }
 
-        final signals = snapshot.data ?? const <SignalFeedItem>[];
+        final referenceTime = DateTime.now();
+        final signals = (snapshot.data ?? const <SignalFeedItem>[])
+            .where((signal) => _isSignalActive(signal, at: referenceTime))
+            .toList(growable: false);
         _cachedActiveSignals = signals;
 
         if (signals.isEmpty) {
           return _EmptyTabState(
             onRefresh: _refreshActiveSignals,
-            title: 'No Active Signals',
-            subtitle:
-                'No live signals are available right now. Pull to refresh.',
+            title: l10n.tr('No Active Signals'),
+            subtitle: l10n.tr(
+              'No live signals are available right now. Pull to refresh.',
+            ),
             icon: Icons.bolt_outlined,
           );
         }
@@ -299,17 +506,23 @@ class _SignalsPageState extends State<SignalsPage> {
           signals: signals,
           onActivateSignal: _openActivationModal,
           onRefresh: _refreshActiveSignals,
+          onLoadMore: _loadMoreActiveSignals,
+          hasMore: _activeHasMore,
+          isLoadingMore: _isLoadingMoreActive,
         );
       },
     );
   }
 
   Widget _buildPastSignalsTab() {
+    final l10n = context.l10n;
+
     return FutureBuilder<List<SignalHistoryItem>>(
       future: _historySignalsFuture,
       builder: (context, snapshot) {
+        final referenceTime = DateTime.now();
         final cachedPastEntries = _historyCache
-            .where((entry) => !entry.isActive)
+            .where((entry) => _isPastHistoryEntry(entry, at: referenceTime))
             .toList(growable: false);
         final canUseCache = cachedPastEntries.isNotEmpty;
 
@@ -318,7 +531,10 @@ class _SignalsPageState extends State<SignalsPage> {
             return _PastSignalsList(
               entries: cachedPastEntries,
               onRefresh: _refreshHistorySignals,
-              showRefreshingBanner: true,
+              onLoadMore: _loadMoreHistorySignals,
+              hasMore: _historyHasMore,
+              isLoadingMore: _isLoadingMoreHistory,
+              showRefreshingBanner: !_isLoadingMoreHistory,
             );
           }
 
@@ -328,18 +544,24 @@ class _SignalsPageState extends State<SignalsPage> {
         if (snapshot.hasError) {
           final message = snapshot.error is ApiException
               ? (snapshot.error as ApiException).message
-              : 'Failed to load past signals.';
+              : l10n.tr('Failed to load past signals.');
 
           if (canUseCache) {
             return _PastSignalsList(
               entries: cachedPastEntries,
               onRefresh: _refreshHistorySignals,
-              topMessage: 'Showing cached history. $message',
+              onLoadMore: _loadMoreHistorySignals,
+              hasMore: _historyHasMore,
+              isLoadingMore: _isLoadingMoreHistory,
+              topMessage: l10n.tr(
+                'Showing cached history. {message}',
+                params: <String, String>{'message': message},
+              ),
             );
           }
 
           return _ErrorState(
-            title: 'Unable to load past signals',
+            title: l10n.tr('Unable to load past signals'),
             message: message,
             onRetry: _refreshHistorySignals,
           );
@@ -348,15 +570,16 @@ class _SignalsPageState extends State<SignalsPage> {
         final entries = snapshot.data ?? const <SignalHistoryItem>[];
         _cachedHistorySignals = entries;
         final pastEntries = entries
-            .where((entry) => !entry.isActive)
+            .where((entry) => _isPastHistoryEntry(entry, at: referenceTime))
             .toList(growable: false);
 
         if (pastEntries.isEmpty) {
           return _EmptyTabState(
             onRefresh: _refreshHistorySignals,
-            title: 'No Signal History Yet',
-            subtitle:
-                'Activated signals will appear here once you participate.',
+            title: l10n.tr('No Activated Signal History Yet'),
+            subtitle: l10n.tr(
+              'Activated signals will appear here once you participate.',
+            ),
             icon: Icons.history_rounded,
           );
         }
@@ -364,6 +587,9 @@ class _SignalsPageState extends State<SignalsPage> {
         return _PastSignalsList(
           entries: pastEntries,
           onRefresh: _refreshHistorySignals,
+          onLoadMore: _loadMoreHistorySignals,
+          hasMore: _historyHasMore,
+          isLoadingMore: _isLoadingMoreHistory,
         );
       },
     );
@@ -371,10 +597,11 @@ class _SignalsPageState extends State<SignalsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final selectedTab = _currentTab;
     final subtitle = selectedTab == _SignalTab.active
-        ? 'Showing Active Signals'
-        : 'Showing Past Signals History';
+        ? l10n.tr('Showing Active Signals')
+        : l10n.tr('Showing Past Signals History');
 
     return Column(
       children: [
@@ -387,31 +614,7 @@ class _SignalsPageState extends State<SignalsPage> {
           ),
         ),
         Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 340),
-            switchInCurve: Curves.easeInOutCubic,
-            switchOutCurve: Curves.easeInOutCubic,
-            transitionBuilder: (child, animation) {
-              final curvedAnimation = CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOutCubic,
-              );
-
-              final slideAnimation = Tween<Offset>(
-                begin: const Offset(0.03, 0),
-                end: Offset.zero,
-              ).animate(curvedAnimation);
-
-              return ClipRect(
-                child: FadeTransition(
-                  opacity: curvedAnimation,
-                  child: SlideTransition(
-                    position: slideAnimation,
-                    child: child,
-                  ),
-                ),
-              );
-            },
+          child: RepaintBoundary(
             child: KeyedSubtree(
               key: ValueKey<_SignalTab>(selectedTab),
               child: selectedTab == _SignalTab.active
@@ -438,44 +641,53 @@ class _SignalsHeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Trading Signals',
-          style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
+        Text(
+          l10n.tr('Trading Signals'),
+          style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 4),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 280),
-          switchInCurve: Curves.easeInOutCubic,
-          switchOutCurve: Curves.easeInOutCubic,
-          transitionBuilder: (child, animation) {
-            final curvedAnimation = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeInOutCubic,
-            );
+        SizedBox(
+          height: 18,
+          child: ClipRect(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              layoutBuilder: (currentChild, previousChildren) {
+                return Stack(
+                  alignment: AlignmentDirectional.centerStart,
+                  children: currentChild == null
+                      ? previousChildren
+                      : <Widget>[...previousChildren, currentChild],
+                );
+              },
+              transitionBuilder: (child, animation) {
+                final isIncoming = child.key == ValueKey<String>(subtitle);
+                final slideAnimation = Tween<Offset>(
+                  begin: isIncoming ? const Offset(0, 1) : const Offset(0, -1),
+                  end: Offset.zero,
+                ).animate(animation);
 
-            final slideAnimation = Tween<Offset>(
-              begin: const Offset(0, 0.14),
-              end: Offset.zero,
-            ).animate(curvedAnimation);
-
-            return ClipRect(
-              child: FadeTransition(
-                opacity: curvedAnimation,
-                child: SlideTransition(position: slideAnimation, child: child),
+                return SlideTransition(
+                  position: slideAnimation,
+                  child: FadeTransition(opacity: animation, child: child),
+                );
+              },
+              child: Text(
+                subtitle,
+                key: ValueKey<String>(subtitle),
+                style: const TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            );
-          },
-          child: Text(
-            subtitle,
-            key: ValueKey<String>(subtitle),
-            style: const TextStyle(
-              fontSize: 12,
-              letterSpacing: 1.2,
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -500,6 +712,8 @@ class _SignalsTabSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(4),
@@ -515,10 +729,10 @@ class _SignalsTabSwitcher extends StatelessWidget {
           return Stack(
             clipBehavior: Clip.hardEdge,
             children: [
-              AnimatedPositioned(
+              AnimatedPositionedDirectional(
                 duration: const Duration(milliseconds: 320),
                 curve: Curves.easeInOutCubic,
-                left: selectedTab == _SignalTab.active ? 0 : indicatorWidth,
+                start: selectedTab == _SignalTab.active ? 0 : indicatorWidth,
                 top: 0,
                 bottom: 0,
                 width: indicatorWidth,
@@ -547,7 +761,7 @@ class _SignalsTabSwitcher extends StatelessWidget {
                   Expanded(
                     child: _SignalsTabButton(
                       icon: Icons.bolt_rounded,
-                      label: 'Active Signals',
+                      label: l10n.tr('Active Signals'),
                       selected: selectedTab == _SignalTab.active,
                       onTap: () => onTabChanged(_SignalTab.active),
                     ),
@@ -555,7 +769,7 @@ class _SignalsTabSwitcher extends StatelessWidget {
                   Expanded(
                     child: _SignalsTabButton(
                       icon: Icons.history_rounded,
-                      label: 'Past Signals',
+                      label: l10n.tr('Past Signals'),
                       selected: selectedTab == _SignalTab.past,
                       onTap: () => onTabChanged(_SignalTab.past),
                     ),
@@ -623,43 +837,79 @@ class _ActiveSignalsList extends StatelessWidget {
     required this.signals,
     required this.onActivateSignal,
     required this.onRefresh,
+    required this.onLoadMore,
+    required this.hasMore,
     this.topMessage,
     this.showRefreshingBanner = false,
+    this.isLoadingMore = false,
   });
 
   final List<SignalFeedItem> signals;
   final ValueChanged<SignalFeedItem> onActivateSignal;
   final Future<void> Function() onRefresh;
+  final Future<void> Function() onLoadMore;
+  final bool hasMore;
   final String? topMessage;
   final bool showRefreshingBanner;
+  final bool isLoadingMore;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final hasBanner = topMessage != null || showRefreshingBanner;
+    final itemCount =
+        signals.length + (hasBanner ? 1 : 0) + (isLoadingMore ? 1 : 0);
 
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: signals.length + (hasBanner ? 1 : 0),
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (hasBanner && index == 0) {
-            return _InlineNotice(
-              message: topMessage ?? 'Refreshing active signals...',
-              isError: topMessage != null,
-            );
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (!hasMore || isLoadingMore) {
+            return false;
           }
 
-          final signalIndex = index - (hasBanner ? 1 : 0);
-          return _SignalCard(
-            item: signals[signalIndex],
-            onActivate: onActivateSignal,
-          );
+          final metrics = notification.metrics;
+          if (metrics.pixels >= metrics.maxScrollExtent - 200) {
+            onLoadMore();
+          }
+
+          return false;
         },
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          itemCount: itemCount,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            if (hasBanner && index == 0) {
+              return _InlineNotice(
+                message: topMessage ?? l10n.tr('Refreshing active signals...'),
+                isError: topMessage != null,
+              );
+            }
+
+            final signalIndex = index - (hasBanner ? 1 : 0);
+            if (signalIndex >= signals.length) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  ),
+                ),
+              );
+            }
+
+            return _SignalCard(
+              item: signals[signalIndex],
+              onActivate: onActivateSignal,
+            );
+          },
+        ),
       ),
     );
   }
@@ -669,39 +919,75 @@ class _PastSignalsList extends StatelessWidget {
   const _PastSignalsList({
     required this.entries,
     required this.onRefresh,
+    required this.onLoadMore,
+    required this.hasMore,
     this.topMessage,
     this.showRefreshingBanner = false,
+    this.isLoadingMore = false,
   });
 
   final List<SignalHistoryItem> entries;
   final Future<void> Function() onRefresh;
+  final Future<void> Function() onLoadMore;
+  final bool hasMore;
   final String? topMessage;
   final bool showRefreshingBanner;
+  final bool isLoadingMore;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final hasBanner = topMessage != null || showRefreshingBanner;
+    final itemCount =
+        entries.length + (hasBanner ? 1 : 0) + (isLoadingMore ? 1 : 0);
 
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        itemCount: entries.length + (hasBanner ? 1 : 0),
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (hasBanner && index == 0) {
-            return _InlineNotice(
-              message: topMessage ?? 'Refreshing signal history...',
-              isError: topMessage != null,
-            );
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (!hasMore || isLoadingMore) {
+            return false;
           }
 
-          final historyIndex = index - (hasBanner ? 1 : 0);
-          return _SignalHistoryCard(item: entries[historyIndex]);
+          final metrics = notification.metrics;
+          if (metrics.pixels >= metrics.maxScrollExtent - 200) {
+            onLoadMore();
+          }
+
+          return false;
         },
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          itemCount: itemCount,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            if (hasBanner && index == 0) {
+              return _InlineNotice(
+                message: topMessage ?? l10n.tr('Refreshing signal history...'),
+                isError: topMessage != null,
+              );
+            }
+
+            final historyIndex = index - (hasBanner ? 1 : 0);
+            if (historyIndex >= entries.length) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  ),
+                ),
+              );
+            }
+
+            return _SignalHistoryCard(item: entries[historyIndex]);
+          },
+        ),
       ),
     );
   }
@@ -761,125 +1047,199 @@ class _SignalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final isLong = item.direction.toLowerCase() == 'long';
+    final isExpired = item.hasExpired();
     final isLive = item.isLive;
-    final canActivate = isLive && item.id.isNotEmpty;
+    final isVipUser = (AuthScope.of(context).currentUser?.vipLevel ?? 0) > 0;
+    final isVipLocked = item.vipOnly && !isVipUser;
+    final canActivate =
+        !isExpired && isLive && item.id.isNotEmpty && !isVipLocked;
     final directionColor = isLong ? AppColors.success : AppColors.danger;
+    final statusColor = isExpired
+        ? AppColors.danger
+        : isLive
+        ? AppColors.success
+        : AppColors.textSecondary;
     final createdText = _dateFormat.format(item.createdAt.toLocal());
+
+    final cardContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: directionColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Icon(
+                  isLong
+                      ? Icons.trending_up_rounded
+                      : Icons.trending_down_rounded,
+                  color: directionColor,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.asset,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.tr(
+                      'Created {date}',
+                      params: <String, String>{'date': createdText},
+                    ),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _StatusPill(
+              text: isExpired
+                  ? l10n.tr('EXPIRED')
+                  : isLive
+                  ? l10n.tr('LIVE NOW')
+                  : item.status.toUpperCase(),
+              color: statusColor,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _SignalDetailPill(
+              icon: isLong
+                  ? Icons.north_east_rounded
+                  : Icons.south_east_rounded,
+              label: l10n.tr('Direction'),
+              value: item.direction.toUpperCase(),
+              valueColor: directionColor,
+            ),
+            _SignalDetailPill(
+              icon: Icons.percent_rounded,
+              label: l10n.tr('Expected Profit'),
+              value: '${_percentFormat.format(item.profitPercent)}%',
+              valueColor: directionColor,
+            ),
+            _SignalDetailPill(
+              icon: Icons.schedule_rounded,
+              label: l10n.tr('Duration'),
+              value: item.durationLabel,
+              valueColor: AppColors.textPrimary,
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: canActivate ? () => onActivate(item) : null,
+            icon: const Icon(Icons.flash_on_rounded, size: 20),
+            label: Text(
+              canActivate
+                  ? l10n.tr('Activate Signal')
+                  : isVipLocked
+                  ? l10n.tr('VIP Only')
+                  : isExpired
+                  ? l10n.tr('Expired')
+                  : l10n.tr('Activation Unavailable'),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.background,
+              disabledBackgroundColor: AppColors.surfaceSoft.withValues(
+                alpha: 0.9,
+              ),
+              disabledForegroundColor: AppColors.textMuted,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                letterSpacing: 0.3,
+              ),
+              elevation: 0,
+            ),
+          ),
+        ),
+      ],
+    );
 
     return GlassCard(
       onTap: canActivate ? () => onActivate(item) : null,
       borderColor: directionColor.withValues(alpha: 0.32),
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: directionColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Icon(
-                    isLong
-                        ? Icons.trending_up_rounded
-                        : Icons.trending_down_rounded,
-                    color: directionColor,
-                    size: 22,
+      child: isVipLocked
+          ? Stack(
+              children: [
+                IgnorePointer(
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 3.5, sigmaY: 3.5),
+                    child: Opacity(opacity: 0.35, child: cardContent),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.asset,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.background.withValues(alpha: 0.36),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Created $createdText',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              _StatusPill(
-                text: isLive ? 'LIVE NOW' : item.status.toUpperCase(),
-                color: isLive ? AppColors.success : AppColors.textSecondary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _SignalDetailPill(
-                icon: isLong
-                    ? Icons.north_east_rounded
-                    : Icons.south_east_rounded,
-                label: 'Direction',
-                value: item.direction.toUpperCase(),
-                valueColor: directionColor,
-              ),
-              _SignalDetailPill(
-                icon: Icons.percent_rounded,
-                label: 'Expected Profit',
-                value: '${_percentFormat.format(item.profitPercent)}%',
-                valueColor: directionColor,
-              ),
-              _SignalDetailPill(
-                icon: Icons.schedule_rounded,
-                label: 'Duration',
-                value: item.durationLabel,
-                valueColor: AppColors.textPrimary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: canActivate ? () => onActivate(item) : null,
-              icon: const Icon(Icons.flash_on_rounded, size: 20),
-              label: Text(
-                canActivate ? 'Activate Signal' : 'Activation Unavailable',
-                
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.background,
-                disabledBackgroundColor: AppColors.surfaceSoft.withValues(
-                  alpha: 0.9,
-                ),
-                disabledForegroundColor: AppColors.textMuted,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 20,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                textStyle: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  letterSpacing: 0.3,
-                ),
-                elevation: 0,
-              ),
+                const Positioned.fill(child: Center(child: _VipOnlyOverlay())),
+              ],
+            )
+          : cardContent,
+    );
+  }
+}
+
+class _VipOnlyOverlay extends StatelessWidget {
+  const _VipOnlyOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.background.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.9)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_rounded, size: 16, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text(
+            l10n.tr('VIP Only'),
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -951,6 +1311,7 @@ class _SignalHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final isLong = item.direction.toLowerCase() == 'long';
     final directionColor = isLong ? AppColors.success : AppColors.danger;
     final statusColor = _statusColor(item.status);
@@ -1027,7 +1388,7 @@ class _SignalHistoryCard extends StatelessWidget {
                     width: tileWidth,
                     child: _HistoryMetricTile(
                       icon: Icons.account_balance_wallet_outlined,
-                      label: 'Entry Balance',
+                      label: l10n.tr('Entry Balance'),
                       value: _moneyFormat.format(item.entryBalance),
                     ),
                   ),
@@ -1035,7 +1396,7 @@ class _SignalHistoryCard extends StatelessWidget {
                     width: tileWidth,
                     child: _HistoryMetricTile(
                       icon: Icons.pie_chart_outline_rounded,
-                      label: 'Participation',
+                      label: l10n.tr('Participation'),
                       value: _moneyFormat.format(item.participationAmount),
                     ),
                   ),
@@ -1043,7 +1404,7 @@ class _SignalHistoryCard extends StatelessWidget {
                     width: tileWidth,
                     child: _HistoryMetricTile(
                       icon: Icons.percent_rounded,
-                      label: 'Profit Rate',
+                      label: l10n.tr('Profit Rate'),
                       value: '${_percentFormat.format(item.profitPercent)}%',
                       valueColor: directionColor,
                     ),
@@ -1052,7 +1413,7 @@ class _SignalHistoryCard extends StatelessWidget {
                     width: tileWidth,
                     child: _HistoryMetricTile(
                       icon: Icons.trending_up_rounded,
-                      label: 'Profit Earned',
+                      label: l10n.tr('Profit Earned'),
                       value: profitText,
                       valueColor: item.profitAmount > 0
                           ? AppColors.success
@@ -1076,14 +1437,16 @@ class _SignalHistoryCard extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _InfoRow(label: 'Started', value: startedText),
+                _InfoRow(label: l10n.tr('Started'), value: startedText),
                 const SizedBox(height: 6),
                 _InfoRow(
-                  label: item.isCompleted ? 'Completed' : 'Ended',
+                  label: item.isCompleted
+                      ? l10n.tr('Completed')
+                      : l10n.tr('Ended'),
                   value: endedText,
                 ),
                 const SizedBox(height: 6),
-                _InfoRow(label: 'Duration', value: item.durationLabel),
+                _InfoRow(label: l10n.tr('Duration'), value: item.durationLabel),
               ],
             ),
           ),
@@ -1272,6 +1635,8 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -1293,7 +1658,7 @@ class _ErrorState extends StatelessWidget {
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 14),
-              PrimaryButton(text: 'Retry', onPressed: onRetry),
+              PrimaryButton(text: l10n.tr('Retry'), onPressed: onRetry),
             ],
           ),
         ),

@@ -23,6 +23,7 @@ class Signal(Base):
     profit_percent = Column(Float, nullable=False)
     duration_hours = Column(Integer, nullable=False)
     status = Column(String(20), nullable=False, default="active")  # active, expired, completed
+    vip_only = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime(timezone=True),

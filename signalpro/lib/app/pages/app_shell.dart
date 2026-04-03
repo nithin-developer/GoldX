@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/pages/deposit_page.dart';
 import 'package:signalpro/app/pages/home_page.dart';
 import 'package:signalpro/app/pages/market_page.dart';
@@ -47,6 +48,7 @@ class _AppShellState extends State<AppShell> {
     }
 
     _openingSupportLink = true;
+    final l10n = context.l10n;
     _walletApi ??= WalletApi(dio: AuthScope.of(context).apiClient.dio);
 
     try {
@@ -56,8 +58,8 @@ class _AppShellState extends State<AppShell> {
       if (supportUrl == null || supportUrl.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Support link is not configured yet.'),
+            SnackBar(
+              content: Text(l10n.tr('Support link is not configured yet.')),
             ),
           );
         }
@@ -73,8 +75,10 @@ class _AppShellState extends State<AppShell> {
       if (launchUri == null || !launchUri.hasScheme) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Support link is invalid. Contact administrator.'),
+            SnackBar(
+              content: Text(
+                l10n.tr('Support link is invalid. Contact administrator.'),
+              ),
             ),
           );
         }
@@ -88,16 +92,20 @@ class _AppShellState extends State<AppShell> {
 
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to open support link on this device.'),
+          SnackBar(
+            content: Text(
+              l10n.tr('Unable to open support link on this device.'),
+            ),
           ),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not load support link. Please try again.'),
+          SnackBar(
+            content: Text(
+              l10n.tr('Could not load support link. Please try again.'),
+            ),
           ),
         );
       }
@@ -114,6 +122,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final page = _buildCurrentPage();
     final wide = MediaQuery.sizeOf(context).width >= 1024;
 
@@ -147,31 +156,31 @@ class _AppShellState extends State<AppShell> {
                         color: AppColors.textMuted,
                       ),
                       labelType: NavigationRailLabelType.all,
-                      destinations: const [
+                      destinations: [
                         NavigationRailDestination(
-                          icon: Icon(Icons.home_outlined),
-                          selectedIcon: Icon(Icons.home_rounded),
-                          label: Text('Home'),
+                          icon: const Icon(Icons.home_outlined),
+                          selectedIcon: const Icon(Icons.home_rounded),
+                          label: Text(l10n.tr('Home')),
                         ),
                         NavigationRailDestination(
-                          icon: Icon(Icons.bolt_outlined),
-                          selectedIcon: Icon(Icons.bolt_rounded),
-                          label: Text('Signals'),
+                          icon: const Icon(Icons.bolt_outlined),
+                          selectedIcon: const Icon(Icons.bolt_rounded),
+                          label: Text(l10n.tr('Signals')),
                         ),
                         NavigationRailDestination(
-                          icon: Icon(Icons.candlestick_chart_outlined),
-                          selectedIcon: Icon(Icons.candlestick_chart_rounded),
-                          label: Text('Market'),
+                          icon: const Icon(Icons.candlestick_chart_outlined),
+                          selectedIcon: const Icon(Icons.candlestick_chart_rounded),
+                          label: Text(l10n.tr('Market')),
                         ),
                         NavigationRailDestination(
-                          icon: Icon(Icons.groups_outlined),
-                          selectedIcon: Icon(Icons.groups_2_rounded),
-                          label: Text('Referrals'),
+                          icon: const Icon(Icons.groups_outlined),
+                          selectedIcon: const Icon(Icons.groups_2_rounded),
+                          label: Text(l10n.tr('Referrals')),
                         ),
                         NavigationRailDestination(
-                          icon: Icon(Icons.person_outline_rounded),
-                          selectedIcon: Icon(Icons.person_rounded),
-                          label: Text('Profile'),
+                          icon: const Icon(Icons.person_outline_rounded),
+                          selectedIcon: const Icon(Icons.person_rounded),
+                          label: Text(l10n.tr('Profile')),
                         ),
                       ],
                     ),
@@ -206,31 +215,31 @@ class _AppShellState extends State<AppShell> {
               },
               backgroundColor: AppColors.surface.withValues(alpha: 0.95),
               indicatorColor: AppColors.primary.withValues(alpha: 0.2),
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: 'Home',
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home),
+                  label: l10n.tr('Home'),
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.bolt_outlined),
-                  selectedIcon: Icon(Icons.bolt),
-                  label: 'Signals',
+                  icon: const Icon(Icons.bolt_outlined),
+                  selectedIcon: const Icon(Icons.bolt),
+                  label: l10n.tr('Signals'),
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.candlestick_chart_outlined),
-                  selectedIcon: Icon(Icons.candlestick_chart),
-                  label: 'Market',
+                  icon: const Icon(Icons.candlestick_chart_outlined),
+                  selectedIcon: const Icon(Icons.candlestick_chart),
+                  label: l10n.tr('Market'),
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.groups_outlined),
-                  selectedIcon: Icon(Icons.groups_rounded),
-                  label: 'Referrals',
+                  icon: const Icon(Icons.groups_outlined),
+                  selectedIcon: const Icon(Icons.groups_rounded),
+                  label: l10n.tr('Referrals'),
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
-                  label: 'Profile',
+                  icon: const Icon(Icons.person_outline),
+                  selectedIcon: const Icon(Icons.person),
+                  label: l10n.tr('Profile'),
                 ),
               ],
             ),
@@ -275,13 +284,15 @@ class _BodyLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: AppHeader(
-            title: 'SignalPro',
-            subtitle: _tabSubtitle(tab),
+            title: l10n.tr('GoldX'),
+            subtitle: _tabSubtitle(tab, l10n),
             onNotificationsTap: onNotificationsTap,
           ),
         ),
@@ -296,18 +307,18 @@ class _BodyLayout extends StatelessWidget {
     );
   }
 
-  String _tabSubtitle(AppTab tab) {
+  String _tabSubtitle(AppTab tab, AppLocalizations l10n) {
     switch (tab) {
       case AppTab.home:
-        return 'Dashboard';
+        return l10n.tr('Dashboard');
       case AppTab.signals:
-        return 'Active Signals';
+        return l10n.tr('Active Signals');
       case AppTab.market:
-        return 'Live Market';
+        return l10n.tr('Live Market');
       case AppTab.referrals:
-        return 'Invite & VIP';
+        return l10n.tr('Invite & VIP');
       case AppTab.profile:
-        return 'Account';
+        return l10n.tr('Account');
     }
   }
 }

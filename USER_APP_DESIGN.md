@@ -10,9 +10,9 @@ I am designing this as a **professional fintech-style app**, with emphasis on:
 
 ---
 
-# 1. Product UI Direction for SignalPro
+# 1. Product UI Direction for GoldX
 
-**SignalPro** should feel like a:
+**GoldX** should feel like a:
 
 * premium trading dashboard
 * clean investment product
@@ -41,7 +41,7 @@ The core visual style should be:
 
 ## App Name
 
-**SignalPro**
+**GoldX**
 
 ## Design Personality
 
@@ -129,7 +129,7 @@ Best for:
 
 * slightly more modern and friendly appearance
 
-## Recommended choice for SignalPro
+## Recommended choice for GoldX
 
 **Inter**
 
@@ -199,7 +199,7 @@ Use an 8px spacing system:
 
 # 6. Navigation Structure
 
-For SignalPro, the best MVP navigation is a **bottom navigation bar** with 5 main tabs.
+For GoldX, the best MVP navigation is a **bottom navigation bar** with 5 main tabs.
 
 ## Bottom Nav Tabs
 
@@ -229,7 +229,7 @@ The header should be minimal and functional.
 
 ### Left side
 
-* app logo or SignalPro wordmark
+* app logo or GoldX wordmark
 * optional small greeting text
 
 ### Right side
@@ -289,7 +289,7 @@ A very short branded screen.
 
 ### Elements
 
-* SignalPro logo
+* GoldX logo
 * small animated pulse or chart line
 * loading indicator
 
@@ -307,7 +307,7 @@ This should explain the product quickly.
 
 ### Elements
 
-* headline: “Trade Smarter with SignalPro”
+* headline: “Trade Smarter with GoldX”
 * subtitle: “Track signals, monitor market movement, and manage your account in one place.”
 * buttons:
 
@@ -587,7 +587,7 @@ This must feel fast and responsive.
 
 # 10. Component System
 
-For SignalPro, create reusable UI components.
+For GoldX, create reusable UI components.
 
 ## Core components
 
@@ -678,7 +678,7 @@ Use subtle motion, not flashy effects.
 
 # 14. Loading States
 
-SignalPro needs polished loading UI.
+GoldX needs polished loading UI.
 
 ## Use
 
@@ -741,7 +741,7 @@ Use:
 
 # 17. Responsive Design Rules
 
-Since SignalPro will run on web and mobile:
+Since GoldX will run on web and mobile:
 
 ## Mobile
 
@@ -777,7 +777,7 @@ This makes your app easy to scale.
 
 ---
 
-# 19. Best Navigation Pattern for SignalPro
+# 19. Best Navigation Pattern for GoldX
 
 For a polished MVP, use:
 
@@ -801,7 +801,7 @@ This gives you a good responsive experience across platforms.
 Use this as your **master prompt** in Google Stitch:
 
 ```text
-Design a professional fintech mobile and web app called SignalPro. The app should have a premium dark theme with a clean, modern, data-driven interface. Use a dark navy background, glass-like cards, blue primary accents, green success states, red warning states, and crisp typography like Inter. The layout should be mobile-first but responsive for web. Include a top header with logo, notifications, and profile avatar. Use a bottom navigation bar with Home, Signals, Market, Referrals, and Profile. The Home dashboard should show total balance, profit summary, announcement banner, quick actions, market snapshot, and recent activity. The Signals page should show signal cards with asset, direction, participation, duration, and activate button. Include a Follow Signal screen with signal code input and success/error states. The Market page should show live asset prices and candlestick chart sections. The Referrals page should show invite code, invite link, referral stats, and VIP progress. The Profile page should include account settings, withdrawal password, security settings, and logout. Use smooth subtle animations, rounded cards, clean spacing, clear hierarchy, skeleton loaders, and a premium trading dashboard feel.
+Design a professional fintech mobile and web app called GoldX. The app should have a premium dark theme with a clean, modern, data-driven interface. Use a dark navy background, glass-like cards, blue primary accents, green success states, red warning states, and crisp typography like Inter. The layout should be mobile-first but responsive for web. Include a top header with logo, notifications, and profile avatar. Use a bottom navigation bar with Home, Signals, Market, Referrals, and Profile. The Home dashboard should show total balance, profit summary, announcement banner, quick actions, market snapshot, and recent activity. The Signals page should show signal cards with asset, direction, participation, duration, and activate button. Include a Follow Signal screen with signal code input and success/error states. The Market page should show live asset prices and candlestick chart sections. The Referrals page should show invite code, invite link, referral stats, and VIP progress. The Profile page should include account settings, withdrawal password, security settings, and logout. Use smooth subtle animations, rounded cards, clean spacing, clear hierarchy, skeleton loaders, and a premium trading dashboard feel.
 ```
 
 ---
@@ -813,44 +813,44 @@ You can also generate each screen separately.
 ## Home screen prompt
 
 ```text
-Create a premium dark fintech dashboard for SignalPro. Show a top balance card, daily profit summary, announcement ticker, quick action buttons, market snapshot cards, and recent activity. Use glassmorphism cards, blue primary accents, green profit indicators, and smooth rounded corners. Make it mobile-first and clean.
+Create a premium dark fintech dashboard for GoldX. Show a top balance card, daily profit summary, announcement ticker, quick action buttons, market snapshot cards, and recent activity. Use glassmorphism cards, blue primary accents, green profit indicators, and smooth rounded corners. Make it mobile-first and clean.
 ```
 
 ## Signals page prompt
 
 ```text
-Create a signal listing screen for SignalPro with premium dark UI. Show signal cards with asset name, direction icon, participation rate, duration, status badge, and activate button. Include filter chips, search input, and VIP-only lock states. Use clean spacing and strong visual hierarchy.
+Create a signal listing screen for GoldX with premium dark UI. Show signal cards with asset name, direction icon, participation rate, duration, status badge, and activate button. Include filter chips, search input, and VIP-only lock states. Use clean spacing and strong visual hierarchy.
 ```
 
 ## Follow signal prompt
 
 ```text
-Create a minimal follow-signal screen for SignalPro. Include a signal code input field, paste icon, activate button, and clear success/error states. Use a dark modern finance app style with subtle motion and premium card layout.
+Create a minimal follow-signal screen for GoldX. Include a signal code input field, paste icon, activate button, and clear success/error states. Use a dark modern finance app style with subtle motion and premium card layout.
 ```
 
 ## Market page prompt
 
 ```text
-Create a live market screen for SignalPro. Show asset selector chips, live price tiles, candlestick chart area, timeframe selectors, and change percentage indicators. Use a dark analytical dashboard style with clean borders and polished spacing.
+Create a live market screen for GoldX. Show asset selector chips, live price tiles, candlestick chart area, timeframe selectors, and change percentage indicators. Use a dark analytical dashboard style with clean borders and polished spacing.
 ```
 
 ## Referrals prompt
 
 ```text
-Create a referral dashboard for SignalPro with invite code, copy invite link card, referral stats cards, VIP progress bar, and referral list. Use a premium fintech style with dark background, blue accents, and clean modular cards.
+Create a referral dashboard for GoldX with invite code, copy invite link card, referral stats cards, VIP progress bar, and referral list. Use a premium fintech style with dark background, blue accents, and clean modular cards.
 ```
 
 ## Profile prompt
 
 ```text
-Create a profile/settings screen for SignalPro. Show account info, password change, withdrawal password setup, security options, and logout. Use a clean dark settings layout with grouped cards and subtle icons.
+Create a profile/settings screen for GoldX. Show account info, password change, withdrawal password setup, security options, and logout. Use a clean dark settings layout with grouped cards and subtle icons.
 ```
 
 ---
 
 # 22. Final UI Direction Summary
 
-For SignalPro, the best design choice is:
+For GoldX, the best design choice is:
 
 * **Dark theme**
 * **Inter font**

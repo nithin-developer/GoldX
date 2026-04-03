@@ -5,27 +5,29 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   Chip,
+  Alert,
   Stack,
   Table,
-  Alert,
   Button,
   Dialog,
   Select,
+  Switch,
   MenuItem,
   TableRow,
   TableBody,
   TableCell,
-  TextField,
   TableHead,
-  Typography,
+  TextField,
   IconButton,
   InputLabel,
+  Typography,
   DialogTitle,
   FormControl,
-  DialogContent,
   DialogActions,
+  DialogContent,
   TableContainer,
   CircularProgress,
+  FormControlLabel,
 } from '@mui/material';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -45,13 +47,15 @@ type SignalFormState = {
   direction: string;
   profit_percent: string;
   duration_hours: string;
+  vip_only: boolean;
 };
 
 const initialForm: SignalFormState = {
-  asset: '',
+  asset: 'BTC/USDT',
   direction: 'buy',
   profit_percent: '75',
   duration_hours: '24',
+  vip_only: false,
 };
 
 export function SignalsView() {
@@ -102,9 +106,14 @@ export function SignalsView() {
       direction: form.direction,
       profit_percent: Number(form.profit_percent),
       duration_hours: Number(form.duration_hours),
+      vip_only: form.vip_only,
     };
 
-    if (!payload.asset || Number.isNaN(payload.profit_percent) || Number.isNaN(payload.duration_hours)) {
+    if (
+      !payload.asset ||
+      Number.isNaN(payload.profit_percent) ||
+      Number.isNaN(payload.duration_hours)
+    ) {
       toast.error('Please fill all signal fields correctly');
       return;
     }
@@ -124,6 +133,20 @@ export function SignalsView() {
     }
 
     return parsed.toLocaleString();
+  };
+
+  const isSignalExpired = (signal: SignalData) => {
+    if (!signal.created_at) {
+      return false;
+    }
+    const createdAt = new Date(signal.created_at);
+    if (Number.isNaN(createdAt.getTime())) {
+      return false;
+    }
+    const now = new Date();
+    const expiresAt = new Date(createdAt.getTime() + signal.duration_hours * 60 * 60 * 1000);
+    console.log({ signal, createdAt, expiresAt, now, expired: now > expiresAt });
+    return now > expiresAt;
   };
 
   const expiresAtLabel = (() => {
@@ -163,6 +186,7 @@ export function SignalsView() {
                 <TableCell>Direction</TableCell>
                 <TableCell>Profit %</TableCell>
                 <TableCell>Duration (h)</TableCell>
+                <TableCell>Access</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Created At</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -171,7 +195,7 @@ export function SignalsView() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     <CircularProgress size={24} />
                   </TableCell>
                 </TableRow>
@@ -179,7 +203,7 @@ export function SignalsView() {
 
               {!isLoading && signals.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     No signals found.
                   </TableCell>
                 </TableRow>
@@ -194,8 +218,15 @@ export function SignalsView() {
                   <TableCell>
                     <Chip
                       size="small"
-                      color={signal.status.toLowerCase() === 'active' ? 'success' : 'default'}
-                      label={signal.status}
+                      color={signal.vip_only ? 'warning' : 'default'}
+                      label={signal.vip_only ? 'VIP Only' : 'All Users'}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      size="small"
+                      color={isSignalExpired(signal) ? 'error' : 'success'}
+                      label={isSignalExpired(signal) ? 'Expired' : 'Active'}
                     />
                   </TableCell>
                   <TableCell>{formatCreatedAt(signal.created_at)}</TableCell>
@@ -229,12 +260,30 @@ export function SignalsView() {
         <DialogTitle>Create Signal</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
+            {/* <TextField
               label="Asset"
               value={form.asset}
               onChange={(event) => setForm((prev) => ({ ...prev, asset: event.target.value }))}
               placeholder="BTC/USDT"
-            />
+            /> */}
+            <FormControl fullWidth>
+              <InputLabel id="asset-label">Asset</InputLabel>
+              <Select
+                labelId="asset-label"
+                label="Asset"
+                value={form.asset}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, asset: String(event.target.value) }))
+                }
+              >
+                <MenuItem value="BTC/USDT">BTC/USDT</MenuItem>
+                <MenuItem value="ETH/USDT">ETH/USDT</MenuItem>
+                <MenuItem value="BNB/USDT">BNB/USDT</MenuItem>
+                <MenuItem value="SOL/USDT">SOL/USDT</MenuItem>
+                <MenuItem value="XRP/USDT">XRP/USDT</MenuItem>
+              </Select>
+            </FormControl>
+
             <FormControl fullWidth>
               <InputLabel id="direction-label">Direction</InputLabel>
               <Select
@@ -265,6 +314,17 @@ export function SignalsView() {
                 setForm((prev) => ({ ...prev, duration_hours: event.target.value }))
               }
             />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.vip_only}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, vip_only: event.target.checked }))
+                  }
+                />
+              }
+              label="VIP only signal"
+            />
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -280,7 +340,12 @@ export function SignalsView() {
         <DialogContent>
           {codeResult && (
             <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField value={codeResult.code} multiline minRows={3} inputProps={{ readOnly: true }} />
+              <TextField
+                value={codeResult.code}
+                multiline
+                minRows={3}
+                inputProps={{ readOnly: true }}
+              />
               <Typography variant="body2" color="text.secondary">
                 Expires at: {expiresAtLabel}
               </Typography>

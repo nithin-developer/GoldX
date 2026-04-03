@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/services/wallet_api.dart';
@@ -62,17 +63,18 @@ class _WithdrawPageState extends State<WithdrawPage> {
   }
 
   Future<void> _requestWithdrawal() async {
+    final l10n = context.l10n;
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
     final address = _addressController.text.trim();
     final password = _passwordController.text.trim();
 
     if (amount <= 0) {
-      _showMessage('Please enter a valid withdrawal amount.');
+      _showMessage(l10n.tr('Please enter a valid withdrawal amount.'));
       return;
     }
 
     if (password.isEmpty) {
-      _showMessage('Withdrawal password is required.');
+      _showMessage(l10n.tr('Withdrawal password is required.'));
       return;
     }
 
@@ -91,7 +93,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
         return;
       }
 
-      _showMessage('Withdrawal request submitted successfully.');
+      _showMessage(l10n.tr('Withdrawal request submitted successfully.'));
 
       _amountController.clear();
       _addressController.clear();
@@ -132,9 +134,11 @@ class _WithdrawPageState extends State<WithdrawPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Withdraw Funds'),
+        title: Text(l10n.tr('Withdraw Funds')),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -145,9 +149,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'AVAILABLE LIQUIDITY',
-                  style: TextStyle(
+                Text(
+                  l10n.tr('AVAILABLE LIQUIDITY'),
+                  style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
                     letterSpacing: 1.2,
@@ -168,7 +172,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
                   children: [
                     Expanded(
                       child: _BalanceCard(
-                        title: 'Pending Deposits',
+                        title: l10n.tr('Pending Deposits'),
                         value: _currencyFormatter.format(_walletSummary.pendingDeposits),
                         icon: Icons.account_balance_wallet_rounded,
                         color: AppColors.success,
@@ -177,7 +181,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _BalanceCard(
-                        title: 'Pending Withdrawals',
+                        title: l10n.tr('Pending Withdrawals'),
                         value: _currencyFormatter.format(_walletSummary.pendingWithdrawals),
                         icon: Icons.pending_rounded,
                         color: AppColors.primary,
@@ -190,24 +194,24 @@ class _WithdrawPageState extends State<WithdrawPage> {
           ),
           const SizedBox(height: 20),
           _InputField(
-            label: 'WITHDRAWAL AMOUNT',
+            label: l10n.tr('WITHDRAWAL AMOUNT'),
             controller: _amountController,
             showCurrencyPrefix: true,
-            hint: '0.00',
+            hint: l10n.tr('0.00'),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
           const SizedBox(height: 16),
           _InputField(
-            label: 'DESTINATION ADDRESS / IBAN',
+            label: l10n.tr('DESTINATION ADDRESS / IBAN'),
             controller: _addressController,
-            hint: 'Enter wallet or bank details',
+            hint: l10n.tr('Enter wallet or bank details'),
             maxLines: 3,
           ),
           const SizedBox(height: 16),
           _InputField(
-            label: 'WITHDRAWAL PASSWORD',
+            label: l10n.tr('WITHDRAWAL PASSWORD'),
             controller: _passwordController,
-            hint: 'Enter your withdrawal password',
+            hint: l10n.tr('Enter your withdrawal password'),
             obscureText: true,
             suffix: Icons.lock_outline_rounded,
           ),
@@ -228,10 +232,12 @@ class _WithdrawPageState extends State<WithdrawPage> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Withdrawal requests are reviewed by admin. Make sure your destination details are correct.',
-                    style: TextStyle(
+                    l10n.tr(
+                      'Withdrawal requests are reviewed by admin. Make sure your destination details are correct.',
+                    ),
+                    style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                       height: 1.4,
@@ -244,10 +250,10 @@ class _WithdrawPageState extends State<WithdrawPage> {
           const SizedBox(height: 20),
           PrimaryButton(
             text: _isProcessing
-                ? 'Processing...'
+              ? l10n.tr('Processing...')
                 : _isLoading
-                ? 'Loading wallet...'
-                : 'Request Withdrawal',
+              ? l10n.tr('Loading wallet...')
+              : l10n.tr('Request Withdrawal'),
             onPressed: (_isProcessing || _isLoading) ? null : _requestWithdrawal,
             icon: _isProcessing
                 ? Icons.hourglass_bottom_rounded

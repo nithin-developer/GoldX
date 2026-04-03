@@ -55,11 +55,11 @@ export const navData: NavItem[] = [
     path: '/announcements',
     icon: <Icon icon="solar:user-speak-bold-duotone" width={24} />,
   },
-  {
-    title: 'Reports',
-    path: '/reports',
-    icon: <Icon icon="solar:pie-chart-2-bold-duotone" width={24} />,
-  },
+  // {
+  //   title: 'Reports',
+  //   path: '/reports',
+  //   icon: <Icon icon="solar:pie-chart-2-bold-duotone" width={24} />,
+  // },
   {
     title: 'Settings',
     path: '/settings',

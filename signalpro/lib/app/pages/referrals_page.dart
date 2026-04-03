@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/models/referral_models.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/app_data_api.dart';
@@ -52,6 +53,8 @@ class _ReferralsPageState extends State<ReferralsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return FutureBuilder<_ReferralData>(
       future: _future,
       builder: (context, snapshot) {
@@ -62,15 +65,15 @@ class _ReferralsPageState extends State<ReferralsPage> {
         if (snapshot.hasError) {
           final message = snapshot.error is ApiException
               ? (snapshot.error as ApiException).message
-              : 'Failed to load referral data.';
+              : l10n.tr('Unable to load referrals');
           return _ErrorState(message: message, onRetry: _refresh);
         }
 
         final data = snapshot.data;
         if (data == null) {
-          return const EmptyStateIllustration(
-            title: 'No Data Found',
-            subtitle: 'Referral information is unavailable right now.',
+          return EmptyStateIllustration(
+            title: l10n.tr('No Data Found'),
+            subtitle: l10n.tr('Referral information is unavailable right now.'),
             icon: Icons.group_off_rounded,
           );
         }
@@ -87,9 +90,15 @@ class _ReferralsPageState extends State<ReferralsPage> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const Text('Invite & Earn', style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700)),
+              Text(
+                l10n.tr('Invite & Earn'),
+                style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
-              const Text('Affiliate Portal', style: TextStyle(color: AppColors.textSecondary)),
+              Text(
+                l10n.tr('Affiliate Portal'),
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 12),
               GlassCard(
                 child: Column(
@@ -97,8 +106,17 @@ class _ReferralsPageState extends State<ReferralsPage> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(child: Text('Referral Progress')),
-                        Chip(label: Text('QUALIFIED ${stats.qualifiedReferrals}')),
+                        Expanded(child: Text(l10n.tr('Referral Progress'))),
+                        Chip(
+                          label: Text(
+                            l10n.tr(
+                              'QUALIFIED {count}',
+                              params: <String, String>{
+                                'count': stats.qualifiedReferrals.toString(),
+                              },
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -115,9 +133,11 @@ class _ReferralsPageState extends State<ReferralsPage> {
                       borderRadius: const BorderRadius.all(Radius.circular(8)),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Invite users and increase qualified deposits to unlock higher rewards.',
-                      style: TextStyle(color: AppColors.textSecondary),
+                    Text(
+                      l10n.tr(
+                        'Invite users and increase qualified deposits to unlock higher rewards.',
+                      ),
+                      style: const TextStyle(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -125,9 +145,19 @@ class _ReferralsPageState extends State<ReferralsPage> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _StatCard(title: 'Total Referrals', value: '${stats.totalReferrals}')),
+                  Expanded(
+                    child: _StatCard(
+                      title: l10n.tr('Total Referrals'),
+                      value: '${stats.totalReferrals}',
+                    ),
+                  ),
                   const SizedBox(width: 10),
-                  Expanded(child: _StatCard(title: 'Earned', value: '\$${stats.totalBonusEarned.toStringAsFixed(2)}')),
+                  Expanded(
+                    child: _StatCard(
+                      title: l10n.tr('Earned'),
+                      value: '\$${stats.totalBonusEarned.toStringAsFixed(2)}',
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -135,27 +165,35 @@ class _ReferralsPageState extends State<ReferralsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Invite Code', style: TextStyle(color: AppColors.textSecondary)),
+                    Text(
+                      l10n.tr('Invite Code'),
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
                     const SizedBox(height: 8),
                     Text(
-                      inviteCode.isEmpty ? 'Not available' : inviteCode,
+                      inviteCode.isEmpty ? l10n.tr('Not available') : inviteCode,
                       style: const TextStyle(fontSize: 18, letterSpacing: 2, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 10),
-                    const Text('Invite Link', style: TextStyle(color: AppColors.textSecondary)),
+                    Text(
+                      l10n.tr('Invite Link'),
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
                     const SizedBox(height: 6),
                     Text(inviteLink),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              const SectionHeader(title: 'Recent Activity'),
+              SectionHeader(title: l10n.tr('Recent Activity')),
               const SizedBox(height: 8),
               if (referrals.isEmpty)
-                const GlassCard(
+                GlassCard(
                   child: EmptyStateIllustration(
-                    title: 'No Referrals Yet',
-                    subtitle: 'Share your invite code to start seeing referral activity.',
+                    title: l10n.tr('No Referrals Yet'),
+                    subtitle: l10n.tr(
+                      'Share your invite code to start seeing referral activity.',
+                    ),
                     icon: Icons.group_add_outlined,
                   ),
                 )
@@ -213,6 +251,7 @@ class _ReferralRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final formatter = DateFormat('dd MMM yyyy');
     final bonusValue = item.bonusAmount > 0
         ? '+\$${item.bonusAmount.toStringAsFixed(2)}'
@@ -230,7 +269,16 @@ class _ReferralRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(item.referredEmail ?? 'User #${item.referredUserId}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              Text(
+                item.referredEmail ??
+                    l10n.tr(
+                      'User #{id}',
+                      params: <String, String>{
+                        'id': item.referredUserId.toString(),
+                      },
+                    ),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               Text(
                 '${item.status.toUpperCase()} • ${formatter.format(item.createdAt)}',
                 style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
@@ -258,6 +306,8 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -267,11 +317,14 @@ class _ErrorState extends StatelessWidget {
             children: [
               const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 34),
               const SizedBox(height: 8),
-              const Text('Unable to load referrals', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                l10n.tr('Unable to load referrals'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
               Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
               const SizedBox(height: 12),
-              PrimaryButton(text: 'Retry', onPressed: onRetry),
+              PrimaryButton(text: l10n.tr('Retry'), onPressed: onRetry),
             ],
           ),
         ),
