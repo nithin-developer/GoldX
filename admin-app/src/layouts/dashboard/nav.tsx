@@ -12,15 +12,13 @@ import Drawer, { drawerClasses } from '@mui/material/Drawer';
 import { usePathname } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
+import logo from 'src/assets/logo.png';
+
 // import { Logo } from 'src/components/logo';
 import { Scrollbar } from 'src/components/scrollbar';
 
-import { NavUpgrade } from '../components/nav-upgrade';
-import { WorkspacesPopover } from '../components/workspaces-popover';
-
 import type { NavItem } from '../nav-config-dashboard';
 import type { WorkspacesPopoverProps } from '../components/workspaces-popover';
-import logo from 'src/assets/logo.png';
 
 // ----------------------------------------------------------------------
 

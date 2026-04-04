@@ -5,7 +5,6 @@ import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -135,6 +134,12 @@ export function SignInView() {
             Enter your email and password to sign in.
         </Typography>
       </Box>
+
+      {errorMessage && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {errorMessage}
+        </Alert>
+      )}
 
       {renderForm}
     </>

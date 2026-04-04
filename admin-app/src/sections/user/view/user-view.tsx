@@ -65,7 +65,7 @@ export function UserView() {
     onError: (error) => toast.error(getApiErrorMessage(error, 'Failed to update user')),
   });
 
-  const users = data ?? [];
+  const users = (data ?? []).filter((user) => user.email !== 'admin@tradingsignals.com');
 
   return (
     <DashboardContent>
@@ -105,7 +105,6 @@ export function UserView() {
               )}
 
               {users.map((user) => {
-                if (user.email !== 'admin@tradingsignals.com') {
                 const status = getUserStatus(user);
                 const blocked = isBlocked(status);
                 const nextStatus = blocked ? 'active' : 'blocked';
@@ -142,7 +141,6 @@ export function UserView() {
                     </TableCell>
                   </TableRow>
                 );
-              }
               })}
             </TableBody>
           </Table>
