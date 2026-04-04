@@ -32,7 +32,7 @@ class SplashPage extends StatelessWidget {
                 height: 180,
                 // child: const Icon(Icons.signal_cellular_alt_rounded, size: 62, color: AppColors.background),
                 child: const Image(
-                  image: AssetImage('splash_screen.png'),
+                  image: AssetImage('assets/splash_screen.png'),
                   height: 180,
                   fit: BoxFit.fill,
                 ),

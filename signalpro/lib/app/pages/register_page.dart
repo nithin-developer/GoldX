@@ -228,7 +228,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               const Spacer(),
                               const Center(
                                 child: Image(
-                                  image: AssetImage('logo.png'),
+                                  image: AssetImage('assets/logo.png'),
                                   width: 200,
                                 ),
                               ),

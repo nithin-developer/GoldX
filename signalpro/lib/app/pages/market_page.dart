@@ -26,25 +26,25 @@ class _MarketPageState extends State<MarketPage> {
       symbol: 'BTC',
       pair: 'BTCUSDT',
       label: 'BITCOIN / USDT',
-      logoAsset: 'coins/btc.png',
+      logoAsset: 'assets/coins/btc.png',
     ),
     _MarketCoin(
       symbol: 'ETH',
       pair: 'ETHUSDT',
       label: 'ETHEREUM / USDT',
-      logoAsset: 'coins/eth.png',
+      logoAsset: 'assets/coins/eth.png',
     ),
     _MarketCoin(
       symbol: 'SOL',
       pair: 'SOLUSDT',
       label: 'SOLANA / USDT',
-      logoAsset: 'coins/sol.png',
+      logoAsset: 'assets/coins/sol.png',
     ),
     _MarketCoin(
       symbol: 'AVAX',
       pair: 'AVAXUSDT',
       label: 'AVALANCHE / USDT',
-      logoAsset: 'coins/avax.png',
+      logoAsset: 'assets/coins/avax.png',
     ),
   ];
 

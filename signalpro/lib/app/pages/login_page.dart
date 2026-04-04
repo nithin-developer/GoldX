@@ -124,7 +124,7 @@ class _LoginPageState extends State<LoginPage> {
                               const Spacer(),
                               const Center(
                                 child: Image(
-                                  image: AssetImage('logo.png'),
+                                  image: AssetImage('assets/logo.png'),
                                   width: 200,
                                 ),
                               ),

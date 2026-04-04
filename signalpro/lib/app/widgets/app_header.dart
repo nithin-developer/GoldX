@@ -63,7 +63,7 @@ class _AppHeaderState extends State<AppHeader> {
       child: Row(
         children: [
           const Image(
-            image: AssetImage('logo.png'),
+            image: AssetImage('assets/logo.png'),
             height: 55,
             fit: BoxFit.contain,
           ),

@@ -8,6 +8,7 @@ import 'package:signalpro/app/localization/locale_scope.dart';
 import 'package:signalpro/app/services/auth_controller.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/theme/app_theme.dart';
+import 'package:flutter/foundation.dart';
 
 class GoldXApp extends StatefulWidget {
   const GoldXApp({super.key});
@@ -48,6 +49,23 @@ class _GoldXAppState extends State<GoldXApp> {
             Intl.defaultLocale = _localeController.locale.languageCode;
 
             return MaterialApp(
+              builder: (context, child) {
+                if (kIsWeb) {
+                  return Container(
+                    color: Colors.grey[100], // background like web page
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 450),
+                        child: Container(
+                          child: child,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return child!;
+              },
               debugShowCheckedModeBanner: false,
               locale: _localeController.locale,
               supportedLocales: AppLocalizations.supportedLocales,

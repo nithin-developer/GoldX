@@ -35,25 +35,25 @@ class _HomePageState extends State<HomePage> {
       symbol: 'BTC',
       pair: 'BTCUSDT',
       label: 'BTC / USDT',
-      logoAsset: 'coins/btc.png',
+      logoAsset: 'assets/coins/btc.png',
     ),
     _MarketCoin(
       symbol: 'ETH',
       pair: 'ETHUSDT',
       label: 'ETH / USDT',
-      logoAsset: 'coins/eth.png',
+      logoAsset: 'assets/coins/eth.png',
     ),
     _MarketCoin(
       symbol: 'SOL',
       pair: 'SOLUSDT',
       label: 'SOL / USDT',
-      logoAsset: 'coins/sol.png',
+      logoAsset: 'assets/coins/sol.png',
     ),
     _MarketCoin(
       symbol: 'AVAX',
       pair: 'AVAXUSDT',
       label: 'AVAX / USDT',
-      logoAsset: 'coins/avax.png',
+      logoAsset: 'assets/coins/avax.png',
     ),
   ];
 
