@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -20,6 +21,8 @@ import {
 import { DashboardContent } from 'src/layouts/dashboard';
 import { getApiErrorMessage } from 'src/services/auth.service';
 import { userService, type UserData } from 'src/services/user.service';
+
+import { ConfirmDialog } from 'src/components/confirm-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -49,6 +52,10 @@ function formatBalance(value: number | string | null | undefined) {
 
 export function UserView() {
   const queryClient = useQueryClient();
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<number | null>(null);
+  const [blockUserId, setBlockUserId] = useState<number | null>(null);
+  const [blockUserStatus, setBlockUserStatus] = useState<string>('');
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['users'],
@@ -63,6 +70,25 @@ export function UserView() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (error) => toast.error(getApiErrorMessage(error, 'Failed to update user')),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (id: number) => userService.resetWithdrawalPassword(id),
+    onSuccess: () => {
+      toast.success('Withdrawal password reset to GoldX@1234');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, 'Failed to reset withdrawal password')),
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: number) => userService.deleteUser(id),
+    onSuccess: () => {
+      toast.success('User deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setDeleteUserId(null);
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, 'Failed to delete user')),
   });
 
   const users = (data ?? []).filter((user) => user.email !== 'admin@tradingsignals.com');
@@ -126,16 +152,29 @@ export function UserView() {
                         <Button
                           size="small"
                           variant="outlined"
+                          color="warning"
+                          onClick={() => setResetPasswordUserId(user.id)}
+                        >
+                          Reset WD Password
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
                           color={blocked ? 'success' : 'error'}
-                          onClick={() =>
-                            updateMutation.mutate({
-                              id: user.id,
-                              payload: { status: nextStatus },
-                            })
-                          }
-                          disabled={updateMutation.isPending}
+                          onClick={() => {
+                            setBlockUserId(user.id);
+                            setBlockUserStatus(nextStatus);
+                          }}
                         >
                           {blocked ? 'Unblock' : 'Block'}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={() => setDeleteUserId(user.id)}
+                        >
+                          Delete
                         </Button>
                       </Stack>
                     </TableCell>
@@ -146,6 +185,60 @@ export function UserView() {
           </Table>
         </TableContainer>
       </Card>
+
+      <ConfirmDialog
+        open={resetPasswordUserId !== null}
+        onClose={() => setResetPasswordUserId(null)}
+        onConfirm={() => {
+          if (resetPasswordUserId) {
+            resetPasswordMutation.mutate(resetPasswordUserId);
+            setResetPasswordUserId(null);
+          }
+        }}
+        title="Reset Withdrawal Password"
+        content="Are you sure you want to reset this user's withdrawal password to GoldX@1234?"
+        confirmText="Reset Password"
+        confirmColor="warning"
+        isPending={resetPasswordMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={blockUserId !== null}
+        onClose={() => setBlockUserId(null)}
+        onConfirm={() => {
+          if (blockUserId) {
+            updateMutation.mutate({
+              id: blockUserId,
+              payload: { status: blockUserStatus },
+            });
+            setBlockUserId(null);
+          }
+        }}
+        title={blockUserStatus === 'blocked' ? 'Block User' : 'Unblock User'}
+        content={
+          blockUserStatus === 'blocked'
+            ? 'Are you sure you want to block this user? They will lose access to their account.'
+            : 'Are you sure you want to unblock this user? They will regain access to their account.'
+        }
+        confirmText={blockUserStatus === 'blocked' ? 'Block User' : 'Unblock User'}
+        confirmColor={blockUserStatus === 'blocked' ? 'error' : 'success'}
+        isPending={updateMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteUserId !== null}
+        onClose={() => setDeleteUserId(null)}
+        onConfirm={() => {
+          if (deleteUserId) {
+            deleteUserMutation.mutate(deleteUserId);
+          }
+        }}
+        title="Delete User"
+        content="Are you sure you want to delete this user? This action cannot be undone and will permanently remove all user data."
+        confirmText="Delete User"
+        confirmColor="error"
+        isPending={deleteUserMutation.isPending}
+      />
     </DashboardContent>
   );
 }

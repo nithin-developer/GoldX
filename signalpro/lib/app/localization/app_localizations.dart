@@ -48,6 +48,14 @@ class AppLocalizations {
         'تعذر فتح رابط الدعم على هذا الجهاز.',
     'Could not load support link. Please try again.':
         'تعذر تحميل رابط الدعم. حاول مرة أخرى.',
+    'Android app download is not configured yet.':
+        'رابط تنزيل تطبيق أندرويد غير مُعد بعد.',
+    'Android app download link is invalid. Contact administrator.':
+        'رابط تنزيل تطبيق أندرويد غير صالح. تواصل مع الإدارة.',
+    'Unable to open Android app download on this device.':
+        'تعذر فتح تنزيل تطبيق أندرويد على هذا الجهاز.',
+    'Could not load Android app download link. Please try again.':
+        'تعذر تحميل رابط تنزيل تطبيق أندرويد. حاول مرة أخرى.',
     'GoldX': 'GoldX',
     'Welcome Back': 'مرحبًا بعودتك',
     'Enter your credentials to access your account.':
@@ -85,6 +93,9 @@ class AppLocalizations {
         'يجب أن تكون كلمة المرور 8 أحرف على الأقل.',
     'Passwords do not match.': 'كلمتا المرور غير متطابقتين.',
     'Invite code is required.': 'رمز الدعوة مطلوب.',
+    'Invite code is not available yet.': 'رمز الدعوة غير متاح بعد.',
+    'Invite code copied to clipboard': 'تم نسخ رمز الدعوة إلى الحافظة',
+    'Copy invite code': 'نسخ رمز الدعوة',
     'Please accept terms to continue.': 'يرجى قبول الشروط للمتابعة.',
     'Support': 'الدعم',
     'Deposit': 'إيداع',
@@ -183,6 +194,24 @@ class AppLocalizations {
         'غيّر كلمة مرور تسجيل الدخول لحسابك بأمان',
     'Customer Support': 'دعم العملاء',
     'Open external support link': 'فتح رابط دعم خارجي',
+    'About Us': 'من نحن',
+    'Company profile, PDFs, and certificate':
+        'نبذة الشركة وملفات PDF والشهادة',
+    'GoldX Company Profile': 'ملف تعريف شركة GoldX',
+    'Explore our official introduction, brand statement, and training certificate.':
+        'استعرض مقدمتنا الرسمية وبيان العلامة التجارية وشهادة التدريب.',
+    'Certificate': 'الشهادة',
+    'Professional training completion certificate':
+        'شهادة إكمال تدريب احترافي',
+    'Certificate image could not be loaded.': 'تعذر تحميل صورة الشهادة.',
+    'GoldX Official Introduction': 'المقدمة الرسمية لـ GoldX',
+    'Official overview document': 'مستند نظرة عامة رسمية',
+    'GoldX Colored Statement': 'البيان الملون لـ GoldX',
+    'Brand statement document': 'مستند بيان العلامة التجارية',
+    'Open PDF': 'فتح PDF',
+    'PDF could not be loaded.': 'تعذر تحميل ملف PDF.',
+    'Download Android App': 'تنزيل تطبيق أندرويد',
+    'Download latest GoldX APK': 'تنزيل أحدث ملف APK لتطبيق GoldX',
     'Logout': 'تسجيل الخروج',
     'End active sessions': 'إنهاء الجلسات النشطة',
     'No Profile Data Found': 'لم يتم العثور على بيانات الملف الشخصي',

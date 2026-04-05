@@ -2,6 +2,16 @@ import api from './api';
 
 // ----------------------------------------------------------------------
 
+export type NotificationData = {
+  id: number;
+  user_id: number;
+  title: string;
+  message: string;
+  type: string;
+  is_read: boolean;
+  created_at: string;
+};
+
 export type SendNotificationPayload = {
   title: string;
   message: string;
@@ -71,5 +81,14 @@ export const notificationService = {
   getAnnouncements: async (): Promise<AnnouncementData[]> => {
     const { data } = await api.get<AnnouncementApiResponse[]>('/admin/announcements');
     return (data ?? []).map(mapAnnouncement);
+  },
+
+  getNotifications: async (): Promise<NotificationData[]> => {
+    const { data } = await api.get<NotificationData[]>('/admin/notifications');
+    return data;
+  },
+
+  deleteNotification: async (id: number): Promise<void> => {
+    await api.delete(`/admin/notifications/${id}`);
   },
 };

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin
+from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user_schema import UserListResponse, AdminUserUpdate
 from app.schemas.auth_schema import MessageResponse
@@ -83,3 +84,51 @@ async def update_user(
 
     await db.flush()
     return UserListResponse.model_validate(user)
+
+
+@router.post("/{user_id}/reset-withdrawal-password", response_model=MessageResponse)
+async def reset_withdrawal_password(
+    user_id: Annotated[int, Path(ge=1000000, le=9999999)],
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset a user's withdrawal password to GoldX@1234 (admin only).
+    """
+    from fastapi import HTTPException
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Hash the default password and set it as the withdrawal password
+    default_password = "GoldX@1234"
+    user.withdrawal_password_hash = hash_password(default_password)
+
+    await db.flush()
+    return MessageResponse(message=f"Withdrawal password reset to {default_password}")
+
+
+@router.delete("/{user_id}", response_model=MessageResponse)
+async def delete_user(
+    user_id: Annotated[int, Path(ge=1000000, le=9999999)],
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Delete a user (admin only).
+    """
+    from fastapi import HTTPException
+    from sqlalchemy import delete
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Delete the user
+    await db.execute(delete(User).where(User.id == user_id))
+    await db.flush()
+
+    return MessageResponse(message="User deleted successfully")

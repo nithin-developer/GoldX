@@ -22,4 +22,12 @@ export const userService = {
     const { data } = await api.put<UserData>(`/admin/users/${id}`, payload);
     return data;
   },
+
+  resetWithdrawalPassword: async (id: number): Promise<void> => {
+    await api.post(`/admin/users/${id}/reset-withdrawal-password`);
+  },
+
+  deleteUser: async (id: number): Promise<void> => {
+    await api.delete(`/admin/users/${id}`);
+  },
 };

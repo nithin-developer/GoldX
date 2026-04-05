@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/models/referral_models.dart';
@@ -21,6 +22,27 @@ class ReferralsPage extends StatefulWidget {
 class _ReferralsPageState extends State<ReferralsPage> {
   AppDataApi? _api;
   Future<_ReferralData>? _future;
+
+  void _showMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _copyInviteCode(String inviteCode) async {
+    final l10n = context.l10n;
+    final code = inviteCode.trim();
+
+    if (code.isEmpty) {
+      _showMessage(l10n.tr('Invite code is not available yet.'));
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: code));
+    _showMessage(l10n.tr('Invite code copied to clipboard'));
+  }
 
   @override
   void didChangeDependencies() {
@@ -81,9 +103,6 @@ class _ReferralsPageState extends State<ReferralsPage> {
         final stats = data.stats;
         final referrals = data.referrals;
         final inviteCode = (stats.inviteCode ?? '').trim();
-        final inviteLink = inviteCode.isEmpty
-            ? '--'
-            : 'signalpro.app/join/ref/${inviteCode.toLowerCase()}';
 
         return RefreshIndicator(
           onRefresh: _refresh,
@@ -170,17 +189,29 @@ class _ReferralsPageState extends State<ReferralsPage> {
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      inviteCode.isEmpty ? l10n.tr('Not available') : inviteCode,
-                      style: const TextStyle(fontSize: 18, letterSpacing: 2, fontWeight: FontWeight.w700),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            inviteCode.isEmpty
+                                ? l10n.tr('Not available')
+                                : inviteCode,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: inviteCode.isEmpty
+                              ? null
+                              : () => _copyInviteCode(inviteCode),
+                          tooltip: l10n.tr('Copy invite code'),
+                          icon: const Icon(Icons.copy_rounded),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      l10n.tr('Invite Link'),
-                      style: const TextStyle(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(inviteLink),
                   ],
                 ),
               ),

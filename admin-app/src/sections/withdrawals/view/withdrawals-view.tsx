@@ -33,6 +33,8 @@ import {
   type AdminWithdrawal,
 } from 'src/services/wallet-admin.service';
 
+import { ConfirmDialog } from 'src/components/confirm-dialog';
+
 // ----------------------------------------------------------------------
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
@@ -70,6 +72,7 @@ export function WithdrawalsView() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<AdminWithdrawal | null>(null);
   const [adminNote, setAdminNote] = useState('');
+  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['admin-withdrawals', statusFilter],
@@ -242,12 +245,7 @@ export function WithdrawalsView() {
                 color="error"
                 variant="outlined"
                 disabled={isPendingAction}
-                onClick={() =>
-                  rejectMutation.mutate({
-                    id: selectedWithdrawal.id,
-                    note: adminNote.trim() || undefined,
-                  })
-                }
+                onClick={() => setActionType('reject')}
               >
                 {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
               </Button>
@@ -255,12 +253,7 @@ export function WithdrawalsView() {
                 color="success"
                 variant="contained"
                 disabled={isPendingAction}
-                onClick={() =>
-                  approveMutation.mutate({
-                    id: selectedWithdrawal.id,
-                    note: adminNote.trim() || undefined,
-                  })
-                }
+                onClick={() => setActionType('approve')}
               >
                 {approveMutation.isPending ? 'Approving...' : 'Approve'}
               </Button>
@@ -268,6 +261,36 @@ export function WithdrawalsView() {
           )}
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={actionType !== null && selectedWithdrawal !== null}
+        onClose={() => setActionType(null)}
+        onConfirm={() => {
+          if (selectedWithdrawal && actionType) {
+            if (actionType === 'approve') {
+              approveMutation.mutate({
+                id: selectedWithdrawal.id,
+                note: adminNote.trim() || undefined,
+              });
+            } else {
+              rejectMutation.mutate({
+                id: selectedWithdrawal.id,
+                note: adminNote.trim() || undefined,
+              });
+            }
+            setActionType(null);
+          }
+        }}
+        title={actionType === 'approve' ? 'Approve Withdrawal' : 'Reject Withdrawal'}
+        content={
+          actionType === 'approve'
+            ? 'Are you sure you want to approve this withdrawal? The funds will be sent to the user\'s wallet address.'
+            : 'Are you sure you want to reject this withdrawal? The user will be notified of the rejection.'
+        }
+        confirmText={actionType === 'approve' ? 'Approve Withdrawal' : 'Reject Withdrawal'}
+        confirmColor={actionType === 'approve' ? 'success' : 'error'}
+        isPending={isPendingAction}
+      />
     </DashboardContent>
   );
 }

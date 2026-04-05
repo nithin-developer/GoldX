@@ -34,6 +34,8 @@ import {
   walletAdminService,
 } from 'src/services/wallet-admin.service';
 
+import { ConfirmDialog } from 'src/components/confirm-dialog';
+
 // ----------------------------------------------------------------------
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
@@ -71,6 +73,7 @@ export function DepositsView() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedDeposit, setSelectedDeposit] = useState<AdminDeposit | null>(null);
   const [adminNote, setAdminNote] = useState('');
+  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['admin-deposits', statusFilter],
@@ -257,12 +260,7 @@ export function DepositsView() {
                 color="error"
                 variant="outlined"
                 disabled={isPendingAction}
-                onClick={() =>
-                  rejectMutation.mutate({
-                    id: selectedDeposit.id,
-                    note: adminNote.trim() || undefined,
-                  })
-                }
+                onClick={() => setActionType('reject')}
               >
                 {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
               </Button>
@@ -270,12 +268,7 @@ export function DepositsView() {
                 color="success"
                 variant="contained"
                 disabled={isPendingAction}
-                onClick={() =>
-                  approveMutation.mutate({
-                    id: selectedDeposit.id,
-                    note: adminNote.trim() || undefined,
-                  })
-                }
+                onClick={() => setActionType('approve')}
               >
                 {approveMutation.isPending ? 'Approving...' : 'Approve'}
               </Button>
@@ -283,6 +276,36 @@ export function DepositsView() {
           )}
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={actionType !== null && selectedDeposit !== null}
+        onClose={() => setActionType(null)}
+        onConfirm={() => {
+          if (selectedDeposit && actionType) {
+            if (actionType === 'approve') {
+              approveMutation.mutate({
+                id: selectedDeposit.id,
+                note: adminNote.trim() || undefined,
+              });
+            } else {
+              rejectMutation.mutate({
+                id: selectedDeposit.id,
+                note: adminNote.trim() || undefined,
+              });
+            }
+            setActionType(null);
+          }
+        }}
+        title={actionType === 'approve' ? 'Approve Deposit' : 'Reject Deposit'}
+        content={
+          actionType === 'approve'
+            ? 'Are you sure you want to approve this deposit? The funds will be added to the user\'s account.'
+            : 'Are you sure you want to reject this deposit? The user will be notified of the rejection.'
+        }
+        confirmText={actionType === 'approve' ? 'Approve Deposit' : 'Reject Deposit'}
+        confirmColor={actionType === 'approve' ? 'success' : 'error'}
+        isPending={isPendingAction}
+      />
     </DashboardContent>
   );
 }

@@ -22,6 +22,7 @@ from app.routes.admin.users_admin import router as admin_users_router
 from app.routes.admin.signals_admin import router as admin_signals_router
 from app.routes.admin.reports_admin import router as admin_reports_router
 from app.routes.admin.settings_admin import router as admin_settings_router
+from app.routes.admin.notification_admin import router as admin_notification_router
 
 # Configure logging
 logging.basicConfig(
@@ -163,3 +164,4 @@ app.include_router(admin_users_router, prefix=api_prefix)
 app.include_router(admin_signals_router, prefix=api_prefix)
 app.include_router(admin_reports_router, prefix=api_prefix)
 app.include_router(admin_settings_router, prefix=api_prefix)
+app.include_router(admin_notification_router, prefix=api_prefix)

@@ -39,6 +39,7 @@ import {
 } from 'src/services/signal.service';
 
 import { Iconify } from 'src/components/iconify';
+import { ConfirmDialog } from 'src/components/confirm-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -63,6 +64,7 @@ export function SignalsView() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [deleteSignalId, setDeleteSignalId] = useState<string | null>(null);
   const [codeResult, setCodeResult] = useState<SignalCodeResponse | null>(null);
   const [form, setForm] = useState<SignalFormState>(initialForm);
 
@@ -87,6 +89,7 @@ export function SignalsView() {
     onSuccess: () => {
       toast.success('Signal deleted');
       queryClient.invalidateQueries({ queryKey: ['signals'] });
+      setDeleteSignalId(null);
     },
     onError: () => toast.error('Failed to delete signal'),
   });
@@ -242,8 +245,7 @@ export function SignalsView() {
                       </Button>
                       <IconButton
                         color="error"
-                        onClick={() => deleteMutation.mutate(signal.id)}
-                        disabled={deleteMutation.isPending}
+                        onClick={() => setDeleteSignalId(signal.id)}
                       >
                         <Iconify icon="solar:trash-bin-trash-bold" />
                       </IconButton>
@@ -369,6 +371,21 @@ export function SignalsView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteSignalId !== null}
+        onClose={() => setDeleteSignalId(null)}
+        onConfirm={() => {
+          if (deleteSignalId) {
+            deleteMutation.mutate(deleteSignalId);
+          }
+        }}
+        title="Delete Signal"
+        content="Are you sure you want to delete this signal? This action cannot be undone."
+        confirmText="Delete Signal"
+        confirmColor="error"
+        isPending={deleteMutation.isPending}
+      />
     </DashboardContent>
   );
 }

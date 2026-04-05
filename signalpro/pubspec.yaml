@@ -37,6 +37,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   web_socket_channel: ^3.0.1
   syncfusion_flutter_charts: ^33.1.46
+  syncfusion_flutter_pdfviewer: ^33.1.46
   webview_flutter: ^4.13.0
   webview_flutter_web: ^0.2.3+4
   web: ^1.1.1
@@ -78,6 +79,9 @@ flutter:
     - assets/qr_placeholder.png
     - assets/splash_screen.png
     - assets/app-icon.png
+    - assets/docs/certificate.jpeg
+    - assets/docs/GoldX_Colored_Statement.pdf
+    - assets/docs/GoldX_Official_Introduction_Logo.pdf
 
   fonts:
     - family: Inter

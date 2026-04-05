@@ -13,16 +13,19 @@ import 'package:signalpro/app/pages/deposit_history_page.dart';
 import 'package:signalpro/app/pages/withdrawal_history_page.dart';
 import 'package:signalpro/app/pages/withdrawal_password_page.dart';
 import 'package:signalpro/app/pages/change_password_page.dart';
+import 'package:signalpro/app/pages/about_us_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
     required this.onSupport,
+    required this.onDownloadAndroidApp,
     required this.onLogout,
     required this.user,
     super.key,
   });
 
   final VoidCallback onSupport;
+  final VoidCallback onDownloadAndroidApp;
   final VoidCallback onLogout;
   final UserProfile? user;
 
@@ -85,6 +88,12 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const WithdrawalHistoryPage()),
     );
+  }
+
+  void _openAboutUsPage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const AboutUsPage()));
   }
 
   @override
@@ -234,6 +243,20 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 10),
               _SectionTag(l10n.tr('SUPPORT')),
               const SizedBox(height: 8),
+              _TileCard(
+                title: l10n.tr('About Us'),
+                subtitle: l10n.tr('Company profile, PDFs, and certificate'),
+                icon: Icons.info_outline_rounded,
+                onTap: _openAboutUsPage,
+              ),
+              const SizedBox(height: 10),
+              _TileCard(
+                title: l10n.tr('Download Android App'),
+                subtitle: l10n.tr('Download latest GoldX APK'),
+                icon: Icons.android_rounded,
+                onTap: widget.onDownloadAndroidApp,
+              ),
+              const SizedBox(height: 10),
               _TileCard(
                 title: l10n.tr('Customer Support'),
                 subtitle: l10n.tr('Open external support link'),

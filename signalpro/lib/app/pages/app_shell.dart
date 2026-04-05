@@ -8,6 +8,7 @@ import 'package:signalpro/app/pages/profile_page.dart';
 import 'package:signalpro/app/pages/referrals_page.dart';
 import 'package:signalpro/app/pages/signals_page.dart';
 import 'package:signalpro/app/pages/withdraw_page.dart';
+import 'package:signalpro/app/config/api_config.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/services/wallet_api.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
@@ -29,6 +30,19 @@ class _AppShellState extends State<AppShell> {
   AppTab _currentTab = AppTab.home;
   WalletApi? _walletApi;
   bool _openingSupportLink = false;
+  bool _openingApkLink = false;
+
+  String get _androidApkUrl {
+    const override = String.fromEnvironment('ANDROID_APK_URL', defaultValue: '');
+    final normalized = override.trim();
+    if (normalized.isNotEmpty) {
+      return normalized;
+    }
+
+    return Uri.parse(ApiConfig.baseUrl)
+        .resolve('/uploads/GoldX-latest.apk')
+        .toString();
+  }
 
   void _openDeposit() => Navigator.of(
     context,
@@ -40,6 +54,10 @@ class _AppShellState extends State<AppShell> {
 
   void _openSupport() {
     _openSupportExternalLink();
+  }
+
+  void _openAndroidAppDownload() {
+    _launchAndroidAppDownload();
   }
 
   Future<void> _openSupportExternalLink() async {
@@ -111,6 +129,76 @@ class _AppShellState extends State<AppShell> {
       }
     } finally {
       _openingSupportLink = false;
+    }
+  }
+
+  Future<void> _launchAndroidAppDownload() async {
+    if (_openingApkLink) {
+      return;
+    }
+
+    _openingApkLink = true;
+    final l10n = context.l10n;
+
+    try {
+      final apkUrl = _androidApkUrl.trim();
+      if (apkUrl.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                l10n.tr('Android app download is not configured yet.'),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final launchUri = Uri.tryParse(apkUrl);
+      if (launchUri == null || !launchUri.hasScheme) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                l10n.tr(
+                  'Android app download link is invalid. Contact administrator.',
+                ),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final launched = await launchUrl(
+        launchUri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.tr('Unable to open Android app download on this device.'),
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.tr(
+                'Could not load Android app download link. Please try again.',
+              ),
+            ),
+          ),
+        );
+      }
+    } finally {
+      _openingApkLink = false;
     }
   }
 
@@ -265,6 +353,7 @@ class _AppShellState extends State<AppShell> {
         return ProfilePage(
           user: auth.currentUser,
           onSupport: _openSupport,
+          onDownloadAndroidApp: _openAndroidAppDownload,
           onLogout: widget.onLogout,
         );
     }
