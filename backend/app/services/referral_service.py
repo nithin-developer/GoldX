@@ -1,8 +1,16 @@
-from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.referral import Referral
 from app.models.user import User
+from app.services.vip_service import (
+    MIN_QUALIFYING_DEPOSIT,
+    QUALIFIED_REFERRAL_STATUSES,
+    get_next_vip_level,
+    get_next_vip_referral_target,
+    get_referrals_needed_for_next_level,
+    get_team_profit_rate_percent,
+    get_vip_level_for_qualified_referrals,
+)
 
 
 async def get_user_referrals(
@@ -52,10 +60,15 @@ async def get_referral_stats(user: User, db: AsyncSession) -> dict:
     qualified_result = await db.execute(
         select(func.count(Referral.id)).where(
             Referral.referrer_id == user.id,
-            Referral.status.in_(["qualified", "rewarded"]),
+            Referral.deposit_amount >= MIN_QUALIFYING_DEPOSIT,
+            Referral.status.in_(QUALIFIED_REFERRAL_STATUSES),
         )
     )
     qualified_referrals = qualified_result.scalar()
+
+    vip_level = get_vip_level_for_qualified_referrals(qualified_referrals)
+    next_vip_level = get_next_vip_level(vip_level)
+    next_target = get_next_vip_referral_target(vip_level)
 
     # Total bonus earned
     bonus_result = await db.execute(
@@ -70,4 +83,13 @@ async def get_referral_stats(user: User, db: AsyncSession) -> dict:
         "qualified_referrals": qualified_referrals,
         "total_bonus_earned": total_bonus,
         "invite_code": user.invite_code,
+        "vip_level": vip_level,
+        "team_profit_rate_percent": float(get_team_profit_rate_percent(vip_level)),
+        "next_vip_level": next_vip_level,
+        "next_vip_referral_target": next_target,
+        "referrals_needed_for_next_vip": get_referrals_needed_for_next_level(
+            qualified_referrals,
+            vip_level,
+        ),
+        "minimum_referral_deposit": MIN_QUALIFYING_DEPOSIT,
     }

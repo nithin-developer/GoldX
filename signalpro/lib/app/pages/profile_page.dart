@@ -10,6 +10,7 @@ import 'package:signalpro/app/widgets/empty_state_illustration.dart';
 import 'package:signalpro/app/widgets/glass_card.dart';
 import 'package:signalpro/app/widgets/primary_button.dart';
 import 'package:signalpro/app/pages/deposit_history_page.dart';
+import 'package:signalpro/app/pages/reward_history_page.dart';
 import 'package:signalpro/app/pages/withdrawal_history_page.dart';
 import 'package:signalpro/app/pages/withdrawal_password_page.dart';
 import 'package:signalpro/app/pages/change_password_page.dart';
@@ -88,6 +89,12 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const WithdrawalHistoryPage()),
     );
+  }
+
+  void _openRewardHistoryPage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const RewardHistoryPage()));
   }
 
   void _openAboutUsPage() {
@@ -221,6 +228,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 subtitle: l10n.tr('Monitor payouts, status updates, and notes'),
                 icon: Icons.outbox_outlined,
                 onTap: _openWithdrawalHistoryPage,
+              ),
+              const SizedBox(height: 10),
+              _TileCard(
+                title: l10n.tr('Rewards & Team Profit History'),
+                subtitle: l10n.tr('View reward credits, types, and timestamps'),
+                icon: Icons.auto_graph_rounded,
+                onTap: _openRewardHistoryPage,
               ),
               const SizedBox(height: 10),
               _TileCard(

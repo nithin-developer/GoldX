@@ -311,6 +311,44 @@ class _DepositPageState extends State<DepositPage> {
               Expanded(child: _AmountChip(value: 1000, onTap: () => _selectAmount(1000))),
             ],
           ),
+          const SizedBox(height: 12),
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.tr('Deposit & Referral Reward Rules'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.tr(
+                    'Standard deposit reward: 6% (example: \$500 -> \$30, \$1000 -> \$60, \$2000 -> \$120).',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.tr(
+                    'If the deposit is from an invited user: inviter gets 6%, invited user gets 3%.',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 20),
           Text(
             l10n.tr('Transaction Reference (Optional)'),

@@ -13,6 +13,14 @@ class UserProfileResponse(BaseModel):
     is_active: bool
     invite_code: Optional[str] = None
     wallet_balance: Decimal
+    capital_balance: Decimal = Decimal("0")
+    signal_profit_balance: Decimal = Decimal("0")
+    reward_balance: Decimal = Decimal("0")
+    withdrawable_balance: Decimal = Decimal("0")
+    locked_capital_balance: Decimal = Decimal("0")
+    capital_lock_active: bool = False
+    capital_lock_ends_at: Optional[datetime] = None
+    capital_lock_days_remaining: int = 0
     vip_level: int
     has_withdrawal_password: bool = False
     created_at: datetime
@@ -28,6 +36,14 @@ class UpdateProfileRequest(BaseModel):
 
 class DashboardResponse(BaseModel):
     balance: Decimal
+    capital_balance: Decimal = Decimal("0")
+    signal_profit_balance: Decimal = Decimal("0")
+    reward_balance: Decimal = Decimal("0")
+    withdrawable_balance: Decimal = Decimal("0")
+    locked_capital_balance: Decimal = Decimal("0")
+    capital_lock_active: bool = False
+    capital_lock_ends_at: Optional[datetime] = None
+    capital_lock_days_remaining: int = 0
     active_signals: int
     total_profit: Decimal
     vip_level: int
@@ -48,6 +64,14 @@ class HomeRecentActivityResponse(BaseModel):
 
 class HomeDashboardResponse(BaseModel):
     balance: Decimal
+    capital_balance: Decimal = Decimal("0")
+    signal_profit_balance: Decimal = Decimal("0")
+    reward_balance: Decimal = Decimal("0")
+    withdrawable_balance: Decimal = Decimal("0")
+    locked_capital_balance: Decimal = Decimal("0")
+    capital_lock_active: bool = False
+    capital_lock_ends_at: Optional[datetime] = None
+    capital_lock_days_remaining: int = 0
     today_profit: Decimal
     total_profit: Decimal
     active_signals: int
@@ -65,6 +89,9 @@ class AdminUserUpdate(BaseModel):
     vip_level: Optional[int] = None
     role: Optional[str] = None
     wallet_balance: Optional[Decimal] = None
+    capital_balance: Optional[Decimal] = None
+    signal_profit_balance: Optional[Decimal] = None
+    reward_balance: Optional[Decimal] = None
 
 
 class UserListResponse(BaseModel):
@@ -74,8 +101,30 @@ class UserListResponse(BaseModel):
     role: str
     is_active: bool
     wallet_balance: Decimal
+    capital_balance: Decimal = Decimal("0")
+    signal_profit_balance: Decimal = Decimal("0")
+    reward_balance: Decimal = Decimal("0")
+    withdrawable_balance: Decimal = Decimal("0")
+    locked_capital_balance: Decimal = Decimal("0")
+    capital_lock_active: bool = False
+    capital_lock_ends_at: Optional[datetime] = None
+    capital_lock_days_remaining: int = 0
     vip_level: int
+    wallet_address: Optional[str] = None
+    referral_count: int = 0
+    referral_total_deposits: Decimal = Decimal("0")
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class AdminUserReferralItemResponse(BaseModel):
+    referral_id: int
+    referred_user_id: int
+    referred_email: Optional[str] = None
+    referred_full_name: Optional[str] = None
+    deposit_amount: Decimal = Decimal("0")
+    bonus_amount: Decimal = Decimal("0")
+    status: str
+    created_at: datetime

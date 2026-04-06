@@ -3,6 +3,6 @@ class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     // defaultValue: 'https://api.goldxvip.com/api/v1',
-    defaultValue: 'http://10.150.95.251:8000/api/v1',
+    defaultValue: 'http://10.17.234.251:8000/api/v1',
   );
 }

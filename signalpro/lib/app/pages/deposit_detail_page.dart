@@ -195,6 +195,18 @@ class _DepositDetailPageState extends State<DepositDetailPage> {
                             : l10n.tr('Not provided'),
                       ),
                       _DetailRow(
+                        label: l10n.tr('Type'),
+                        value: record.transactionType.toUpperCase(),
+                      ),
+                      _DetailRow(
+                        label: l10n.tr('Self Reward'),
+                        value: _currencyFormatter.format(record.selfRewardAmount),
+                      ),
+                      _DetailRow(
+                        label: l10n.tr('Referrer Reward'),
+                        value: _currencyFormatter.format(record.referrerRewardAmount),
+                      ),
+                      _DetailRow(
                         label: l10n.tr('Admin Note'),
                         value: record.adminNote?.isNotEmpty == true
                             ? record.adminNote!

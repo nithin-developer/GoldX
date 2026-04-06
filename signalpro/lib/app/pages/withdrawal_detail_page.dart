@@ -188,6 +188,22 @@ class _WithdrawalDetailPageState extends State<WithdrawalDetailPage> {
                             : l10n.tr('Pending review'),
                       ),
                       _DetailRow(
+                        label: l10n.tr('Type'),
+                        value: record.transactionType.toUpperCase(),
+                      ),
+                      _DetailRow(
+                        label: l10n.tr('Fee Rate'),
+                        value: '${record.feeRatePercent.toStringAsFixed(0)}%',
+                      ),
+                      _DetailRow(
+                        label: l10n.tr('Fee Amount'),
+                        value: _currencyFormatter.format(record.feeAmount),
+                      ),
+                      _DetailRow(
+                        label: l10n.tr('Net Payout'),
+                        value: _currencyFormatter.format(record.netAmount),
+                      ),
+                      _DetailRow(
                         label: l10n.tr('Destination'),
                         value: record.walletAddress?.isNotEmpty == true
                             ? record.walletAddress!

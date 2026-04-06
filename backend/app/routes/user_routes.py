@@ -18,6 +18,7 @@ from app.schemas.user_schema import (
     UpdateProfileRequest,
     DashboardResponse,
 )
+from app.services import wallet_service
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -26,6 +27,8 @@ router = APIRouter(prefix="/users", tags=["Users"])
 @router.get("/profile", response_model=UserProfileResponse)
 async def get_profile(current_user: User = Depends(get_current_user)):
     """Get the current user's full profile."""
+    balance_breakdown = wallet_service.build_user_balance_breakdown(current_user)
+
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
@@ -34,7 +37,15 @@ async def get_profile(current_user: User = Depends(get_current_user)):
         role=current_user.role,
         is_active=current_user.is_active,
         invite_code=current_user.invite_code,
-        wallet_balance=current_user.wallet_balance,
+        wallet_balance=balance_breakdown["balance"],
+        capital_balance=balance_breakdown["capital_balance"],
+        signal_profit_balance=balance_breakdown["signal_profit_balance"],
+        reward_balance=balance_breakdown["reward_balance"],
+        withdrawable_balance=balance_breakdown["withdrawable_balance"],
+        locked_capital_balance=balance_breakdown["locked_capital_balance"],
+        capital_lock_active=balance_breakdown["capital_lock_active"],
+        capital_lock_ends_at=balance_breakdown["capital_lock_ends_at"],
+        capital_lock_days_remaining=balance_breakdown["capital_lock_days_remaining"],
         vip_level=current_user.vip_level,
         has_withdrawal_password=current_user.withdrawal_password_hash is not None,
         created_at=current_user.created_at,
@@ -55,6 +66,8 @@ async def update_profile(
 
     await db.flush()
 
+    balance_breakdown = wallet_service.build_user_balance_breakdown(current_user)
+
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
@@ -63,7 +76,15 @@ async def update_profile(
         role=current_user.role,
         is_active=current_user.is_active,
         invite_code=current_user.invite_code,
-        wallet_balance=current_user.wallet_balance,
+        wallet_balance=balance_breakdown["balance"],
+        capital_balance=balance_breakdown["capital_balance"],
+        signal_profit_balance=balance_breakdown["signal_profit_balance"],
+        reward_balance=balance_breakdown["reward_balance"],
+        withdrawable_balance=balance_breakdown["withdrawable_balance"],
+        locked_capital_balance=balance_breakdown["locked_capital_balance"],
+        capital_lock_active=balance_breakdown["capital_lock_active"],
+        capital_lock_ends_at=balance_breakdown["capital_lock_ends_at"],
+        capital_lock_days_remaining=balance_breakdown["capital_lock_days_remaining"],
         vip_level=current_user.vip_level,
         has_withdrawal_password=current_user.withdrawal_password_hash is not None,
         created_at=current_user.created_at,
@@ -148,8 +169,18 @@ async def _build_dashboard_summary(current_user: User, db: AsyncSession) -> dict
         else:
             active_signal_alerts.append(f"New active signal live for {asset}")
 
+    balance_breakdown = wallet_service.build_user_balance_breakdown(current_user)
+
     return {
-        "balance": current_user.wallet_balance,
+        "balance": balance_breakdown["balance"],
+        "capital_balance": balance_breakdown["capital_balance"],
+        "signal_profit_balance": balance_breakdown["signal_profit_balance"],
+        "reward_balance": balance_breakdown["reward_balance"],
+        "withdrawable_balance": balance_breakdown["withdrawable_balance"],
+        "locked_capital_balance": balance_breakdown["locked_capital_balance"],
+        "capital_lock_active": balance_breakdown["capital_lock_active"],
+        "capital_lock_ends_at": balance_breakdown["capital_lock_ends_at"],
+        "capital_lock_days_remaining": balance_breakdown["capital_lock_days_remaining"],
         "active_signals": active_signals,
         "total_profit": total_profit,
         "today_profit": today_profit,
@@ -364,6 +395,14 @@ async def get_dashboard(
 
     return DashboardResponse(
         balance=summary["balance"],
+        capital_balance=summary["capital_balance"],
+        signal_profit_balance=summary["signal_profit_balance"],
+        reward_balance=summary["reward_balance"],
+        withdrawable_balance=summary["withdrawable_balance"],
+        locked_capital_balance=summary["locked_capital_balance"],
+        capital_lock_active=summary["capital_lock_active"],
+        capital_lock_ends_at=summary["capital_lock_ends_at"],
+        capital_lock_days_remaining=summary["capital_lock_days_remaining"],
         active_signals=summary["active_signals"],
         total_profit=summary["total_profit"],
         vip_level=summary["vip_level"],
@@ -389,6 +428,14 @@ async def get_home_dashboard(
 
     return HomeDashboardResponse(
         balance=summary["balance"],
+        capital_balance=summary["capital_balance"],
+        signal_profit_balance=summary["signal_profit_balance"],
+        reward_balance=summary["reward_balance"],
+        withdrawable_balance=summary["withdrawable_balance"],
+        locked_capital_balance=summary["locked_capital_balance"],
+        capital_lock_active=summary["capital_lock_active"],
+        capital_lock_ends_at=summary["capital_lock_ends_at"],
+        capital_lock_days_remaining=summary["capital_lock_days_remaining"],
         today_profit=summary["today_profit"],
         total_profit=summary["total_profit"],
         active_signals=summary["active_signals"],

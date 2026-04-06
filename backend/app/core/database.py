@@ -2,6 +2,8 @@ import re
 import secrets
 import string
 import uuid
+from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import DeclarativeBase
@@ -53,6 +55,17 @@ def _normalize_existing_invite_code(invite_code: str | None) -> str | None:
         return None
 
     return normalized
+
+
+def _to_utc_datetime(value):
+    """Normalize datetime values to UTC-aware datetimes for timestamptz columns."""
+    if not isinstance(value, datetime):
+        return value
+
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
 
 
 def _generate_random_invite_code(used_codes: set[str]) -> str:
@@ -383,6 +396,30 @@ def _ensure_wallet_public_ids_and_payment_proofs(sync_conn) -> None:
                 text("ALTER TABLE deposits ADD COLUMN payment_proof_filename VARCHAR(255)")
             )
 
+        if "self_reward_amount" not in deposit_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE deposits "
+                    "ADD COLUMN self_reward_amount NUMERIC(18,2) DEFAULT 0"
+                )
+            )
+
+        if "referrer_reward_amount" not in deposit_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE deposits "
+                    "ADD COLUMN referrer_reward_amount NUMERIC(18,2) DEFAULT 0"
+                )
+            )
+
+        sync_conn.execute(
+            text(
+                "UPDATE deposits "
+                "SET self_reward_amount = COALESCE(self_reward_amount, 0), "
+                "referrer_reward_amount = COALESCE(referrer_reward_amount, 0)"
+            )
+        )
+
         deposit_rows = sync_conn.execute(
             text("SELECT id FROM deposits WHERE public_id IS NULL OR public_id = ''")
         ).fetchall()
@@ -407,6 +444,97 @@ def _ensure_wallet_public_ids_and_payment_proofs(sync_conn) -> None:
                 text("ALTER TABLE withdrawals ADD COLUMN public_id VARCHAR(36)")
             )
 
+        if "capital_amount" not in withdrawal_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE withdrawals "
+                    "ADD COLUMN capital_amount NUMERIC(18,2) DEFAULT 0"
+                )
+            )
+
+        if "signal_profit_amount" not in withdrawal_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE withdrawals "
+                    "ADD COLUMN signal_profit_amount NUMERIC(18,2) DEFAULT 0"
+                )
+            )
+
+        if "reward_amount" not in withdrawal_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE withdrawals "
+                    "ADD COLUMN reward_amount NUMERIC(18,2) DEFAULT 0"
+                )
+            )
+
+        if "fee_rate_percent" not in withdrawal_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE withdrawals "
+                    "ADD COLUMN fee_rate_percent NUMERIC(5,2) DEFAULT 10"
+                )
+            )
+
+        if "fee_amount" not in withdrawal_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE withdrawals "
+                    "ADD COLUMN fee_amount NUMERIC(18,2) DEFAULT 0"
+                )
+            )
+
+        if "net_amount" not in withdrawal_columns:
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE withdrawals "
+                    "ADD COLUMN net_amount NUMERIC(18,2) DEFAULT 0"
+                )
+            )
+
+        sync_conn.execute(
+            text(
+                "UPDATE withdrawals "
+                "SET capital_amount = COALESCE(capital_amount, 0), "
+                "signal_profit_amount = COALESCE(signal_profit_amount, 0), "
+                "reward_amount = COALESCE(reward_amount, 0)"
+            )
+        )
+
+        sync_conn.execute(
+            text(
+                "UPDATE withdrawals "
+                "SET fee_rate_percent = 10 "
+                "WHERE fee_rate_percent IS NULL OR fee_rate_percent <= 0"
+            )
+        )
+
+        sync_conn.execute(
+            text(
+                "UPDATE withdrawals "
+                "SET fee_amount = ROUND(COALESCE(amount, 0) * 0.10, 2) "
+                "WHERE (fee_amount IS NULL OR fee_amount <= 0) "
+                "AND COALESCE(amount, 0) > 0"
+            )
+        )
+
+        sync_conn.execute(
+            text(
+                "UPDATE withdrawals "
+                "SET net_amount = ROUND(COALESCE(amount, 0) - COALESCE(fee_amount, 0), 2) "
+                "WHERE (net_amount IS NULL OR net_amount <= 0) "
+                "AND COALESCE(amount, 0) > 0"
+            )
+        )
+
+        sync_conn.execute(
+            text(
+                "UPDATE withdrawals "
+                "SET net_amount = 0 "
+                "WHERE COALESCE(amount, 0) <= 0"
+            )
+        )
+
         withdrawal_rows = sync_conn.execute(
             text("SELECT id FROM withdrawals WHERE public_id IS NULL OR public_id = ''")
         ).fetchall()
@@ -422,6 +550,137 @@ def _ensure_wallet_public_ids_and_payment_proofs(sync_conn) -> None:
                 "CREATE UNIQUE INDEX IF NOT EXISTS ix_withdrawals_public_id ON withdrawals (public_id)"
             )
         )
+
+
+def _ensure_user_balance_breakdown_columns(sync_conn) -> None:
+    """Add user balance breakdown fields and backfill safe defaults for existing users."""
+    inspector = inspect(sync_conn)
+    table_names = set(inspector.get_table_names())
+    if "users" not in table_names:
+        return
+
+    user_column_definitions = {
+        column["name"]: column for column in inspector.get_columns("users")
+    }
+    user_columns = set(user_column_definitions)
+
+    if "capital_balance" not in user_columns:
+        sync_conn.execute(
+            text("ALTER TABLE users ADD COLUMN capital_balance NUMERIC(18,2) DEFAULT 0")
+        )
+
+    if "signal_profit_balance" not in user_columns:
+        sync_conn.execute(
+            text(
+                "ALTER TABLE users "
+                "ADD COLUMN signal_profit_balance NUMERIC(18,2) DEFAULT 0"
+            )
+        )
+
+    if "reward_balance" not in user_columns:
+        sync_conn.execute(
+            text("ALTER TABLE users ADD COLUMN reward_balance NUMERIC(18,2) DEFAULT 0")
+        )
+
+    if "first_deposit_approved_at" not in user_columns:
+        sync_conn.execute(
+            text(
+                "ALTER TABLE users "
+                "ADD COLUMN first_deposit_approved_at TIMESTAMP WITH TIME ZONE"
+            )
+        )
+    else:
+        first_deposit_type = user_column_definitions["first_deposit_approved_at"].get(
+            "type"
+        )
+        is_timezone_aware = bool(getattr(first_deposit_type, "timezone", False))
+
+        if not is_timezone_aware:
+            # Legacy environments may have created this as TIMESTAMP without timezone.
+            # Convert in-place and treat existing values as UTC.
+            sync_conn.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ALTER COLUMN first_deposit_approved_at "
+                    "TYPE TIMESTAMP WITH TIME ZONE "
+                    "USING first_deposit_approved_at AT TIME ZONE 'UTC'"
+                )
+            )
+
+    if "initial_capital_locked_amount" not in user_columns:
+        sync_conn.execute(
+            text(
+                "ALTER TABLE users "
+                "ADD COLUMN initial_capital_locked_amount NUMERIC(18,2) DEFAULT 0"
+            )
+        )
+
+    # Preserve current totals for legacy users by treating existing balance as capital.
+    sync_conn.execute(
+        text(
+            "UPDATE users "
+            "SET capital_balance = COALESCE(wallet_balance, 0) "
+            "WHERE COALESCE(capital_balance, 0) = 0 "
+            "AND COALESCE(signal_profit_balance, 0) = 0 "
+            "AND COALESCE(reward_balance, 0) = 0 "
+            "AND COALESCE(wallet_balance, 0) <> 0"
+        )
+    )
+
+    sync_conn.execute(
+        text(
+            "UPDATE users "
+            "SET initial_capital_locked_amount = COALESCE(initial_capital_locked_amount, 0)"
+        )
+    )
+
+    if "deposits" in table_names:
+        users_without_first_deposit = sync_conn.execute(
+            text("SELECT id FROM users WHERE first_deposit_approved_at IS NULL")
+        ).fetchall()
+
+        for row in users_without_first_deposit:
+            user_id = int(row[0])
+            first_deposit = sync_conn.execute(
+                text(
+                    "SELECT amount, created_at "
+                    "FROM deposits "
+                    "WHERE user_id = :user_id AND status = 'approved' "
+                    "ORDER BY created_at ASC "
+                    "LIMIT 1"
+                ),
+                {"user_id": user_id},
+            ).fetchone()
+
+            if not first_deposit:
+                continue
+
+            sync_conn.execute(
+                text(
+                    "UPDATE users "
+                    "SET first_deposit_approved_at = :approved_at, "
+                    "initial_capital_locked_amount = CASE "
+                    "WHEN COALESCE(initial_capital_locked_amount, 0) > 0 "
+                    "THEN initial_capital_locked_amount "
+                    "ELSE :locked_amount END "
+                    "WHERE id = :user_id"
+                ),
+                {
+                    "approved_at": _to_utc_datetime(first_deposit[1]),
+                    "locked_amount": first_deposit[0],
+                    "user_id": user_id,
+                },
+            )
+
+    sync_conn.execute(
+        text(
+            "UPDATE users "
+            "SET wallet_balance = "
+            "COALESCE(capital_balance, 0) + "
+            "COALESCE(signal_profit_balance, 0) + "
+            "COALESCE(reward_balance, 0)"
+        )
+    )
 
 
 def _ensure_support_link_and_drop_legacy_support_table(sync_conn) -> None:
@@ -442,7 +701,7 @@ def _ensure_support_link_and_drop_legacy_support_table(sync_conn) -> None:
         sync_conn.execute(text("DROP TABLE IF EXISTS support_messages"))
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency that provides an async database session."""
     async with async_session_factory() as session:
         try:
@@ -463,6 +722,7 @@ async def init_db():
         await conn.run_sync(_ensure_user_ids_and_invite_codes)
         await conn.run_sync(_ensure_signal_public_ids)
         await conn.run_sync(_ensure_wallet_public_ids_and_payment_proofs)
+        await conn.run_sync(_ensure_user_balance_breakdown_columns)
         await conn.run_sync(_ensure_support_link_and_drop_legacy_support_table)
 
 

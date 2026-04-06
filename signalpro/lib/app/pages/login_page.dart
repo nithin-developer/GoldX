@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:signalpro/app/localization/app_localizations.dart';
 import 'package:signalpro/app/theme/app_colors.dart';
@@ -105,6 +106,12 @@ class _LoginPageState extends State<LoginPage> {
                   return ScrollConfiguration(
                     behavior: const MaterialScrollBehavior().copyWith(
                       scrollbars: false,
+                      dragDevices: <PointerDeviceKind>{
+                        PointerDeviceKind.touch,
+                        PointerDeviceKind.mouse,
+                        PointerDeviceKind.stylus,
+                        PointerDeviceKind.unknown,
+                      },
                     ),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(

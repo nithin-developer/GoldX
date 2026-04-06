@@ -164,6 +164,15 @@ class AppLocalizations {
     'Invite & Earn': 'ادعُ واربح',
     'Affiliate Portal': 'بوابة الإحالة',
     'Referral Progress': 'تقدم الإحالات',
+    'Current VIP': 'مستوى VIP الحالي',
+    'Team Profit Rate': 'معدل ربح الفريق',
+    'VIP Levels': 'مستويات VIP',
+    'Qualified Referrals': 'الإحالات المؤهلة',
+    'Need {count} more qualified referrals for VIP {level}.':
+        'تحتاج {count} إحالات مؤهلة إضافية للوصول إلى VIP {level}.',
+    'Maximum VIP reached': 'تم الوصول إلى أعلى مستوى VIP',
+    'Each referral qualifies after approved deposits reach {amount} USD.':
+        'تتأهل كل إحالة بعد أن تصل الإيداعات المعتمدة إلى {amount} دولار.',
     'QUALIFIED {count}': 'مؤهل {count}',
     'Invite users and increase qualified deposits to unlock higher rewards.':
         'ادعُ مستخدمين وزِد الإيداعات المؤهلة لفتح مكافآت أعلى.',
@@ -186,6 +195,9 @@ class AppLocalizations {
     'Withdrawal History': 'سجل السحوبات',
     'Monitor payouts, status updates, and notes':
         'راقب المدفوعات وتحديثات الحالة والملاحظات',
+    'Rewards & Team Profit History': 'سجل المكافآت وأرباح الفريق',
+    'View reward credits, types, and timestamps':
+        'عرض أرصدة المكافآت والأنواع والطوابع الزمنية',
     'Withdrawal Password': 'كلمة مرور السحب',
     'Login Password': 'كلمة مرور تسجيل الدخول',
     'Configured': 'مُعَدَّة',
@@ -195,14 +207,12 @@ class AppLocalizations {
     'Customer Support': 'دعم العملاء',
     'Open external support link': 'فتح رابط دعم خارجي',
     'About Us': 'من نحن',
-    'Company profile, PDFs, and certificate':
-        'نبذة الشركة وملفات PDF والشهادة',
+    'Company profile, PDFs, and certificate': 'نبذة الشركة وملفات PDF والشهادة',
     'GoldX Company Profile': 'ملف تعريف شركة GoldX',
     'Explore our official introduction, brand statement, and training certificate.':
         'استعرض مقدمتنا الرسمية وبيان العلامة التجارية وشهادة التدريب.',
     'Certificate': 'الشهادة',
-    'Professional training completion certificate':
-        'شهادة إكمال تدريب احترافي',
+    'Professional training completion certificate': 'شهادة إكمال تدريب احترافي',
     'Certificate image could not be loaded.': 'تعذر تحميل صورة الشهادة.',
     'GoldX Official Introduction': 'المقدمة الرسمية لـ GoldX',
     'Official overview document': 'مستند نظرة عامة رسمية',
@@ -257,6 +267,11 @@ class AppLocalizations {
     'Screenshot selection cancelled': 'تم إلغاء اختيار لقطة الشاشة',
     'Payment proof selected': 'تم اختيار إثبات الدفع',
     'DEPOSIT ANALYTICS': 'تحليلات الإيداع',
+    'Deposit & Referral Reward Rules': 'قواعد مكافآت الإيداع والإحالة',
+    'Standard deposit reward: 6% (example: \$500 -> \$30, \$1000 -> \$60, \$2000 -> \$120).':
+        'مكافأة الإيداع القياسية: 6% (مثال: \$500 -> \$30، \$1000 -> \$60، \$2000 -> \$120).',
+    'If the deposit is from an invited user: inviter gets 6%, invited user gets 3%.':
+        'إذا كان الإيداع من مستخدم مدعو: يحصل المُحيل على 6% ويحصل المستخدم المدعو على 3%.',
     'Total requested volume for this filter': 'إجمالي حجم الطلبات لهذا الفلتر',
     'All': 'الكل',
     'Approved': 'مقبول',
@@ -284,8 +299,14 @@ class AppLocalizations {
     'Requested At': 'وقت الطلب',
     'Last Updated': 'آخر تحديث',
     'Pending review': 'قيد المراجعة',
+    'Type': 'النوع',
+    'Type: {value}': 'النوع: {value}',
+    'Date & Time: {value}': 'التاريخ والوقت: {value}',
     'Transaction ID': 'رقم المعاملة',
     'Not provided': 'غير متوفر',
+    'Self Reward': 'مكافأة المستخدم',
+    'Referrer Reward': 'مكافأة المُحيل',
+    'Rewards: +{value}': 'المكافآت: +{value}',
     'Admin Note': 'ملاحظة الإدارة',
     'No admin note yet': 'لا توجد ملاحظة من الإدارة بعد',
     'Unable to load proof image': 'تعذر تحميل صورة الإثبات',
@@ -300,6 +321,31 @@ class AppLocalizations {
         'الحالة غير متاحة حاليًا لهذا السجل.',
     'Withdraw Funds': 'سحب الأموال',
     'AVAILABLE LIQUIDITY': 'السيولة المتاحة',
+    'WITHDRAWABLE BALANCE': 'الرصيد القابل للسحب',
+    'Total Balance: {amount}': 'إجمالي الرصيد: {amount}',
+    'WITHDRAWABLE NOW': 'القابل للسحب الآن',
+    'Capital': 'رأس المال',
+    'Signal Profits': 'أرباح الإشارات',
+    'Team Rewards': 'مكافآت الفريق',
+    'Requested amount exceeds your withdrawable balance.':
+        'المبلغ المطلوب يتجاوز الرصيد القابل للسحب.',
+    'Requested Amount': 'المبلغ المطلوب',
+    'Withdrawal Fee ({percent}%)': 'رسوم السحب ({percent}%)',
+    'Fee: -{value}': 'الرسوم: -{value}',
+    'Fee Rate': 'معدل الرسوم',
+    'Fee Amount': 'مبلغ الرسوم',
+    'Net Payout': 'الصافي المصروف',
+    'Net Payout: {value}': 'الصافي المصروف: {value}',
+    '10% withdrawal fee will be deducted from any withdrawal':
+        'سيتم خصم رسوم سحب بنسبة 10% من أي عملية سحب',
+    'Withdrawal request submitted. Net payout {amount} after 10% fee.':
+        'تم إرسال طلب السحب. الصافي المصروف {amount} بعد خصم رسوم 10%.',
+    'First capital deposit lock: {amount} remains locked for {days} day(s), until {date}.':
+        'قفل أول إيداع رأس مال: يبقى {amount} مقفلاً لمدة {days} يوم/أيام حتى {date}.',
+    'Initial capital lock active: {amount} locked for {days} day(s) until {date}.':
+        'قفل رأس المال الأول نشط: تم قفل {amount} لمدة {days} يوم/أيام حتى {date}.',
+    'Capital from your first approved deposit is locked for 12 days. Signal profits and team rewards remain withdrawable.':
+        'يُقفل رأس المال من أول إيداع مُعتمد لمدة 12 يومًا. تبقى أرباح الإشارات ومكافآت الفريق قابلة للسحب.',
     'WITHDRAWAL AMOUNT': 'مبلغ السحب',
     'DESTINATION ADDRESS / IBAN': 'عنوان الوجهة / IBAN',
     'Enter wallet or bank details': 'أدخل تفاصيل المحفظة أو البنك',
@@ -325,6 +371,18 @@ class AppLocalizations {
     'Your withdrawal is pending admin review. Processing times can vary based on queue volume.':
         'طلب السحب قيد مراجعة الإدارة. قد يختلف وقت المعالجة حسب حجم قائمة الانتظار.',
     'Unable to load withdrawal history.': 'تعذر تحميل سجل السحوبات.',
+    'REWARDS ANALYTICS': 'تحليلات المكافآت',
+    'Total rewards and team profit credits':
+        'إجمالي أرصدة المكافآت وأرباح الفريق',
+    'No Rewards Records': 'لا توجد سجلات مكافآت',
+    'Reward and team profit transactions will appear here.':
+        'ستظهر هنا معاملات المكافآت وأرباح الفريق.',
+    'Unable to load rewards history.': 'تعذر تحميل سجل المكافآت.',
+    'Unable to load rewards history': 'تعذر تحميل سجل المكافآت',
+    'Team Profit Credit': 'قيد ربح الفريق',
+    'Deposit Reward Credit': 'قيد مكافأة الإيداع',
+    'Referral Reward Credit': 'قيد مكافأة الإحالة',
+    'Reward Credit': 'قيد مكافأة',
     'No Withdrawal Records': 'لا توجد سجلات سحب',
     'Your submitted and processed withdrawals will appear here.':
         'ستظهر هنا عمليات السحب المرسلة والمعالجة.',

@@ -13,6 +13,7 @@ from app.schemas.auth_schema import (
 )
 from app.schemas.user_schema import UserProfileResponse
 from app.services import auth_service
+from app.services import wallet_service
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -74,6 +75,8 @@ async def get_me(current_user: User = Depends(get_current_user)):
     """
     Get the current authenticated user's profile.
     """
+    balance_breakdown = wallet_service.build_user_balance_breakdown(current_user)
+
     return UserProfileResponse(
         id=current_user.id,
         email=current_user.email,
@@ -82,7 +85,15 @@ async def get_me(current_user: User = Depends(get_current_user)):
         role=current_user.role,
         is_active=current_user.is_active,
         invite_code=current_user.invite_code,
-        wallet_balance=current_user.wallet_balance,
+        wallet_balance=balance_breakdown["balance"],
+        capital_balance=balance_breakdown["capital_balance"],
+        signal_profit_balance=balance_breakdown["signal_profit_balance"],
+        reward_balance=balance_breakdown["reward_balance"],
+        withdrawable_balance=balance_breakdown["withdrawable_balance"],
+        locked_capital_balance=balance_breakdown["locked_capital_balance"],
+        capital_lock_active=balance_breakdown["capital_lock_active"],
+        capital_lock_ends_at=balance_breakdown["capital_lock_ends_at"],
+        capital_lock_days_remaining=balance_breakdown["capital_lock_days_remaining"],
         vip_level=current_user.vip_level,
         has_withdrawal_password=current_user.withdrawal_password_hash is not None,
         created_at=current_user.created_at,

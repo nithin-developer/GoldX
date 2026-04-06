@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:signalpro/app/pages/launch_gate.dart';
@@ -9,6 +10,20 @@ import 'package:signalpro/app/services/auth_controller.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/theme/app_theme.dart';
 import 'package:flutter/foundation.dart';
+
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  static const Set<PointerDeviceKind> _dragDevices = <PointerDeviceKind>{
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.unknown,
+  };
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => _dragDevices;
+}
 
 class GoldXApp extends StatefulWidget {
   const GoldXApp({super.key});
@@ -49,6 +64,7 @@ class _GoldXAppState extends State<GoldXApp> {
             Intl.defaultLocale = _localeController.locale.languageCode;
 
             return MaterialApp(
+              scrollBehavior: const _AppScrollBehavior(),
               builder: (context, child) {
                 if (kIsWeb) {
                   return Container(
@@ -63,7 +79,6 @@ class _GoldXAppState extends State<GoldXApp> {
                     ),
                   );
                 }
-
                 return child!;
               },
               debugShowCheckedModeBanner: false,

@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
     # Seed admin user
     await seed_admin_user()
 
+    # Normalize referral qualification and VIP levels against current rules.
+    await normalize_vip_and_referral_state()
+
     # Start background workers
     profit_task = asyncio.create_task(start_background_workers())
 
@@ -94,11 +97,27 @@ async def start_background_workers():
 
     try:
         await asyncio.gather(
-            run_periodic_profit_worker(interval_seconds=60),
-            run_periodic_vip_worker(interval_seconds=86400),
+            run_periodic_profit_worker(interval_seconds=3600),
+            run_periodic_vip_worker(interval_seconds=3600),
         )
     except asyncio.CancelledError:
         logger.info("Background workers stopped")
+
+
+async def normalize_vip_and_referral_state():
+    from app.core.database import async_session_factory
+    from app.services.vip_service import normalize_referrals_and_recalculate_vip
+
+    async with async_session_factory() as session:
+        referral_updates, vip_updates = await normalize_referrals_and_recalculate_vip(
+            session
+        )
+        await session.commit()
+
+        if referral_updates > 0:
+            logger.info(f"Startup normalization: {referral_updates} referrals updated")
+        if vip_updates > 0:
+            logger.info(f"Startup normalization: {vip_updates} VIP levels updated")
 
 
 # Create FastAPI app

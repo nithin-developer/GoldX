@@ -23,6 +23,12 @@ class ReferralStatsResponse(BaseModel):
     qualified_referrals: int
     total_bonus_earned: Decimal
     invite_code: Optional[str] = None
+    vip_level: int = 0
+    team_profit_rate_percent: float = 0.0
+    next_vip_level: Optional[int] = None
+    next_vip_referral_target: Optional[int] = None
+    referrals_needed_for_next_vip: int = 0
+    minimum_referral_deposit: Decimal = Decimal("500")
 
 
 class NotificationResponse(BaseModel):

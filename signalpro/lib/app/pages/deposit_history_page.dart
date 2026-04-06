@@ -375,6 +375,7 @@ class _DepositHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final status = _statusVisual(item.status, l10n);
+    final totalReward = item.selfRewardAmount + item.referrerRewardAmount;
 
     return GlassCard(
       onTap: onTap,
@@ -422,6 +423,35 @@ class _DepositHistoryCard extends StatelessWidget {
               fontSize: 12,
             ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.tr(
+              'Type: {value}',
+              params: <String, String>{
+                'value': item.transactionType.toUpperCase(),
+              },
+            ),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          if (totalReward > 0) ...[
+            const SizedBox(height: 6),
+            Text(
+              l10n.tr(
+                'Rewards: +{value}',
+                params: <String, String>{
+                  'value': '\$${totalReward.toStringAsFixed(2)}',
+                },
+              ),
+              style: const TextStyle(
+                color: AppColors.success,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Text(
             item.transactionRef?.isNotEmpty == true

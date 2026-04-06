@@ -635,7 +635,14 @@ class _BalanceHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final balance = _MoneyFormatters.currency(data.balance);
-    final todayProfit = _MoneyFormatters.signed(data.todayProfit);
+    final withdrawable = _MoneyFormatters.currency(data.withdrawableBalance);
+    final capital = _MoneyFormatters.currency(data.capitalBalance);
+    final signalProfits = _MoneyFormatters.currency(data.signalProfitBalance);
+    final teamRewards = _MoneyFormatters.currency(data.rewardBalance);
+    final lockEndsAt = data.capitalLockEndsAt;
+    final lockEndsText = lockEndsAt == null
+        ? '--'
+        : DateFormat('dd MMM yyyy').format(lockEndsAt.toLocal());
 
     return Container(
       decoration: BoxDecoration(
@@ -690,7 +697,7 @@ class _BalanceHeroCard extends StatelessWidget {
                   ),
                 ),
                 _PerformanceChip(
-                  activeSignals: data.activeSignals,
+                  vipLevel: data.vipLevel,
                   totalReferrals: data.totalReferrals,
                 ),
               ],
@@ -703,7 +710,7 @@ class _BalanceHeroCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.tr("TODAY'S PROFIT"),
+                        l10n.tr('WITHDRAWABLE NOW'),
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
@@ -714,7 +721,7 @@ class _BalanceHeroCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        todayProfit,
+                        withdrawable,
                         style: const TextStyle(
                           fontSize: 19,
                           fontWeight: FontWeight.w700,
@@ -728,6 +735,60 @@ class _BalanceHeroCard extends StatelessWidget {
                 _AssetCircleRow(),
               ],
             ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _BreakdownPill(
+                    title: l10n.tr('Capital'),
+                    value: capital,
+                    icon: Icons.account_balance_rounded,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _BreakdownPill(
+                    title: l10n.tr('Signal Profits'),
+                    value: signalProfits,
+                    icon: Icons.trending_up_rounded,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _BreakdownPill(
+                    title: l10n.tr('Team Rewards'),
+                    value: teamRewards,
+                    icon: Icons.groups_rounded,
+                  ),
+                ),
+              ],
+            ),
+            if (data.capitalLockActive) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.42),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  l10n.tr(
+                    'Initial capital lock active: {amount} locked for {days} day(s) until {date}.',
+                    params: <String, String>{
+                      'amount': _MoneyFormatters.currency(data.lockedCapitalBalance),
+                      'days': data.capitalLockDaysRemaining.toString(),
+                      'date': lockEndsText,
+                    },
+                  ),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -737,11 +798,11 @@ class _BalanceHeroCard extends StatelessWidget {
 
 class _PerformanceChip extends StatelessWidget {
   const _PerformanceChip({
-    required this.activeSignals,
+    required this.vipLevel,
     required this.totalReferrals,
   });
 
-  final int activeSignals;
+  final int vipLevel;
   final int totalReferrals;
 
   @override
@@ -766,7 +827,7 @@ class _PerformanceChip extends StatelessWidget {
               Text(
                 l10n.tr(
                   'VIP {level} Level',
-                  params: <String, String>{'level': activeSignals.toString()},
+                  params: <String, String>{'level': vipLevel.toString()},
                 ),
                 style: const TextStyle(
                   fontSize: 10,
@@ -775,6 +836,72 @@ class _PerformanceChip extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.tr('Referrals: {count}', params: {'count': totalReferrals.toString()}),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.secondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BreakdownPill extends StatelessWidget {
+  const _BreakdownPill({
+    required this.title,
+    required this.value,
+    required this.icon,
+  });
+
+  final String title;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 13, color: AppColors.secondary),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.onSurface,
+            ),
           ),
         ],
       ),
@@ -1295,11 +1422,6 @@ class _MoneyFormatters {
   static final DateFormat _dateTimeFormat = DateFormat('dd MMM, hh:mm a');
 
   static String currency(double value) => '\$${_amountFormat.format(value)}';
-
-  static String signed(double value) {
-    final sign = value >= 0 ? '+' : '-';
-    return '$sign\$${_amountFormat.format(value.abs())}';
-  }
 
   static String percent(double? value) {
     if (value == null) {

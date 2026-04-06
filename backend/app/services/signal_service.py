@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from app.models.signal import Signal, SignalCode, UserSignalEntry
 from app.models.user import User
 from app.models.wallet import WalletTransaction
+from app.services.wallet_service import sync_user_total_balance
 
 
 MIN_SIGNAL_ACTIVATION_BALANCE = Decimal("100")
@@ -262,10 +263,11 @@ async def process_completed_signals(db: AsyncSession) -> int:
         entry.status = "completed"
         entry.completed_at = now
 
-        # Credit user wallet
+        # Credit signal profit bucket and sync aggregate balance.
         user_result = await db.execute(select(User).where(User.id == entry.user_id))
         user = user_result.scalar_one()
-        user.wallet_balance += profit
+        user.signal_profit_balance = Decimal(str(user.signal_profit_balance or 0)) + profit
+        sync_user_total_balance(user)
 
         # Create transaction record
         txn = WalletTransaction(

@@ -422,6 +422,47 @@ class _WithdrawalHistoryCard extends StatelessWidget {
               fontSize: 12,
             ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.tr(
+              'Type: {value}',
+              params: <String, String>{
+                'value': item.transactionType.toUpperCase(),
+              },
+            ),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.tr(
+              'Fee: -{value}',
+              params: <String, String>{
+                'value': '\$${item.feeAmount.toStringAsFixed(2)}',
+              },
+            ),
+            style: const TextStyle(
+              color: AppColors.danger,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.tr(
+              'Net Payout: {value}',
+              params: <String, String>{
+                'value': '\$${item.netAmount.toStringAsFixed(2)}',
+              },
+            ),
+            style: const TextStyle(
+              color: AppColors.success,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             item.walletAddress?.isNotEmpty == true

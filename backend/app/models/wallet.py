@@ -35,6 +35,8 @@ class Deposit(Base):
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     amount = Column(Numeric(precision=18, scale=2), nullable=False)
+    self_reward_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0)
+    referrer_reward_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0)
     status = Column(String(20), nullable=False, default="pending")  # pending, approved, rejected
     transaction_ref = Column(String(255), nullable=True)
     payment_proof_filename = Column(String(255), nullable=True)
@@ -66,6 +68,12 @@ class Withdrawal(Base):
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     amount = Column(Numeric(precision=18, scale=2), nullable=False)
+    capital_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0)
+    signal_profit_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0)
+    reward_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0)
+    fee_rate_percent = Column(Numeric(precision=5, scale=2), nullable=False, default=10)
+    fee_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0)
+    net_amount = Column(Numeric(precision=18, scale=2), nullable=False, default=0)
     status = Column(String(20), nullable=False, default="pending")  # pending, approved, rejected
     wallet_address = Column(String(255), nullable=True)
     admin_note = Column(Text, nullable=True)

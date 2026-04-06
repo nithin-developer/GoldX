@@ -78,12 +78,21 @@ class _WithdrawPageState extends State<WithdrawPage> {
       return;
     }
 
+    if (amount > _walletSummary.withdrawableBalance) {
+      _showMessage(
+        l10n.tr(
+          'Requested amount exceeds your withdrawable balance.',
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      await _walletApi!.createWithdrawal(
+      final result = await _walletApi!.createWithdrawal(
         amount: amount,
         withdrawalPassword: password,
         walletAddress: address.isEmpty ? null : address,
@@ -93,7 +102,14 @@ class _WithdrawPageState extends State<WithdrawPage> {
         return;
       }
 
-      _showMessage(l10n.tr('Withdrawal request submitted successfully.'));
+      _showMessage(
+        l10n.tr(
+          'Withdrawal request submitted. Net payout {amount} after 10% fee.',
+          params: <String, String>{
+            'amount': _currencyFormatter.format(result.netAmount),
+          },
+        ),
+      );
 
       _amountController.clear();
       _addressController.clear();
@@ -135,6 +151,19 @@ class _WithdrawPageState extends State<WithdrawPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final lockEndsAt = _walletSummary.capitalLockEndsAt;
+    final lockEndsText = lockEndsAt == null
+        ? '--'
+        : DateFormat('dd MMM yyyy, hh:mm a').format(lockEndsAt.toLocal());
+    final requestedAmount = double.tryParse(_amountController.text.trim()) ?? 0;
+    final feePercent = _walletSummary.withdrawalFeePercent > 0
+      ? _walletSummary.withdrawalFeePercent
+      : 10;
+    final estimatedFee = (requestedAmount * feePercent) / 100;
+    final estimatedNet = (requestedAmount - estimatedFee).clamp(0, double.infinity);
+    final feeNotice = _walletSummary.withdrawalFeeNotice.trim().isEmpty
+      ? l10n.tr('10% withdrawal fee will be deducted from any withdrawal')
+      : _walletSummary.withdrawalFeeNotice;
 
     return Scaffold(
       appBar: AppBar(
@@ -150,7 +179,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  l10n.tr('AVAILABLE LIQUIDITY'),
+                  l10n.tr('WITHDRAWABLE BALANCE'),
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textSecondary,
@@ -160,14 +189,86 @@ class _WithdrawPageState extends State<WithdrawPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _currencyFormatter.format(_walletSummary.balance),
+                  _currencyFormatter.format(_walletSummary.withdrawableBalance),
                   style: const TextStyle(
                     fontSize: 36,
                     color: AppColors.primaryBright,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.tr('Total Balance: {amount}', params: {
+                    'amount': _currencyFormatter.format(_walletSummary.balance),
+                  }),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BalanceCard(
+                        title: l10n.tr('Capital'),
+                        value: _currencyFormatter.format(_walletSummary.capitalBalance),
+                        icon: Icons.account_balance_rounded,
+                        color: AppColors.success,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _BalanceCard(
+                        title: l10n.tr('Signal Profits'),
+                        value: _currencyFormatter.format(_walletSummary.signalProfitBalance),
+                        icon: Icons.trending_up_rounded,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _BalanceCard(
+                        title: l10n.tr('Team Rewards'),
+                        value: _currencyFormatter.format(_walletSummary.rewardBalance),
+                        icon: Icons.groups_rounded,
+                        color: AppColors.highlight,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_walletSummary.capitalLockActive) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Text(
+                      l10n.tr(
+                        'First capital deposit lock: {amount} remains locked for {days} day(s), until {date}.',
+                        params: {
+                          'amount': _currencyFormatter.format(_walletSummary.lockedCapitalBalance),
+                          'days': _walletSummary.capitalLockDaysRemaining.toString(),
+                          'date': lockEndsText,
+                        },
+                      ),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
@@ -199,7 +300,40 @@ class _WithdrawPageState extends State<WithdrawPage> {
             showCurrencyPrefix: true,
             hint: l10n.tr('0.00'),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
           ),
+          if (requestedAmount > 0) ...[
+            const SizedBox(height: 12),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _FeePreviewRow(
+                    label: l10n.tr('Requested Amount'),
+                    value: _currencyFormatter.format(requestedAmount),
+                  ),
+                  const SizedBox(height: 8),
+                  _FeePreviewRow(
+                    label: l10n.tr(
+                      'Withdrawal Fee ({percent}%)',
+                      params: <String, String>{
+                        'percent': feePercent.toStringAsFixed(0),
+                      },
+                    ),
+                    value: '-${_currencyFormatter.format(estimatedFee)}',
+                    valueColor: AppColors.danger,
+                  ),
+                  const SizedBox(height: 8),
+                  _FeePreviewRow(
+                    label: l10n.tr('Net Payout'),
+                    value: _currencyFormatter.format(estimatedNet),
+                    valueColor: AppColors.success,
+                    emphasize: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           _InputField(
             label: l10n.tr('DESTINATION ADDRESS / IBAN'),
@@ -226,6 +360,37 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
+                    Icons.percent_rounded,
+                    size: 18,
+                    color: AppColors.background,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    feeNotice,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          GlassCard(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
                     Icons.info_outline_rounded,
                     size: 18,
                     color: AppColors.background,
@@ -235,7 +400,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
                 Expanded(
                   child: Text(
                     l10n.tr(
-                      'Withdrawal requests are reviewed by admin. Make sure your destination details are correct.',
+                      'Capital from your first approved deposit is locked for 12 days. Signal profits and team rewards remain withdrawable.',
                     ),
                     style: const TextStyle(
                       fontSize: 12,
@@ -324,6 +489,46 @@ class _BalanceCard extends StatelessWidget {
   }
 }
 
+class _FeePreviewRow extends StatelessWidget {
+  const _FeePreviewRow({
+    required this.label,
+    required this.value,
+    this.valueColor = AppColors.textPrimary,
+    this.emphasize = false,
+  });
+
+  final String label;
+  final String value;
+  final Color valueColor;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: emphasize ? 16 : 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _InputField extends StatelessWidget {
   const _InputField({
     required this.label,
@@ -334,6 +539,7 @@ class _InputField extends StatelessWidget {
     this.obscureText = false,
     this.maxLines = 1,
     this.keyboardType,
+    this.onChanged,
   });
 
   final String label;
@@ -344,6 +550,7 @@ class _InputField extends StatelessWidget {
   final bool obscureText;
   final int maxLines;
   final TextInputType? keyboardType;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -362,6 +569,7 @@ class _InputField extends StatelessWidget {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          onChanged: onChanged,
           obscureText: obscureText,
           maxLines: maxLines,
           keyboardType: keyboardType,

@@ -60,6 +60,14 @@ class HomeRecentActivity {
 class HomeDashboardData {
   const HomeDashboardData({
     required this.balance,
+    required this.capitalBalance,
+    required this.signalProfitBalance,
+    required this.rewardBalance,
+    required this.withdrawableBalance,
+    required this.lockedCapitalBalance,
+    required this.capitalLockActive,
+    required this.capitalLockEndsAt,
+    required this.capitalLockDaysRemaining,
     required this.todayProfit,
     required this.totalProfit,
     required this.activeSignals,
@@ -71,6 +79,14 @@ class HomeDashboardData {
   });
 
   final double balance;
+  final double capitalBalance;
+  final double signalProfitBalance;
+  final double rewardBalance;
+  final double withdrawableBalance;
+  final double lockedCapitalBalance;
+  final bool capitalLockActive;
+  final DateTime? capitalLockEndsAt;
+  final int capitalLockDaysRemaining;
   final double todayProfit;
   final double totalProfit;
   final int activeSignals;
@@ -87,6 +103,14 @@ class HomeDashboardData {
 
     return HomeDashboardData(
       balance: _toDouble(json['balance']),
+      capitalBalance: _toDouble(json['capital_balance']),
+      signalProfitBalance: _toDouble(json['signal_profit_balance']),
+      rewardBalance: _toDouble(json['reward_balance']),
+      withdrawableBalance: _toDouble(json['withdrawable_balance']),
+      lockedCapitalBalance: _toDouble(json['locked_capital_balance']),
+      capitalLockActive: json['capital_lock_active'] == true,
+      capitalLockEndsAt: _toNullableDateTime(json['capital_lock_ends_at']),
+      capitalLockDaysRemaining: _toInt(json['capital_lock_days_remaining']),
       todayProfit: _toDouble(json['today_profit']),
       totalProfit: _toDouble(json['total_profit']),
       activeSignals: _toInt(json['active_signals']),
@@ -113,6 +137,15 @@ class HomeDashboardData {
           : const <HomeRecentActivity>[],
     );
   }
+}
+
+DateTime? _toNullableDateTime(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+
+  final parsed = DateTime.tryParse(value.toString());
+  return parsed;
 }
 
 double _toDouble(dynamic value) {
