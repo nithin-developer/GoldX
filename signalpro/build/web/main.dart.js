@@ -30830,7 +30830,7 @@ _.r=e
 _.a=f},
 AO:function AO(a,b){this.c=a
 this.a=b},
-b90(a){var s=new A.afT(A.aUs(A.aU2("http://10.17.234.251:8000/api/v1")),a)
+b90(a){var s=new A.afT(A.aUs(A.aU2("https://api.goldxvip.com/api/v1")),a)
 s.afC(a)
 return s},
 afT:function afT(a,b){this.a=a
@@ -30875,7 +30875,7 @@ b3Q(a){var s,r=a==null?null:B.c.aD(a)
 if(r==null||r.length===0)return null
 s=A.a0V(r)
 if(s!=null&&s.gyu())return r
-return A.fM("http://10.17.234.251:8000/api/v1",0,null).ag(r).k(0)},
+return A.fM("https://api.goldxvip.com/api/v1",0,null).ag(r).k(0)},
 aeI(a){var s=a==null?null:J.aU(a),r=s==null?null:A.oP(s),q=r==null?null:r.jx()
 return q==null?new A.b7(A.cm(0,0,!1),0,!1):q},
 bjT(a){var s,r
@@ -103865,7 +103865,7 @@ an(){return new A.a6k()}}
 A.a6k.prototype={
 aP(){var s,r,q,p=this
 p.bh()
-s=A.aUs(A.aU2("http://10.17.234.251:8000/api/v1"))
+s=A.aUs(A.aU2("https://api.goldxvip.com/api/v1"))
 s=new A.PK(s)
 r=$.aQ()
 s=new A.r9(s,new A.aBT(),B.mL,r)
@@ -104026,7 +104026,7 @@ an(){return new A.Ju(B.qR)}}
 A.Ju.prototype={
 gagE(){var s=B.c.aD("")
 if(s.length!==0)return s
-return A.fM("http://10.17.234.251:8000/api/v1",0,null).ag("/uploads/GoldX-latest.apk").k(0)},
+return A.fM("https://api.goldxvip.com/api/v1",0,null).ag("/uploads/GoldX-latest.apk").k(0)},
 atM(){var s=this.c
 s.toString
 return A.eK(s,!1).hw(A.kI(new A.aDZ(),null,t.H))},
