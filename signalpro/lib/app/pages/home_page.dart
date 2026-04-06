@@ -1259,7 +1259,11 @@ class _ActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final visual = _ActivityVisual.forType(activity.type);
+    final title = _localizedTitle(l10n);
+    final subtitle = _localizedSubtitle(l10n);
+    final tag = _localizedTag(l10n);
     final valueText = _MoneyFormatters.activityAmount(
       activity.amount,
       activity.isPositive,
@@ -1289,7 +1293,7 @@ class _ActivityRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  activity.title,
+                  title,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1298,9 +1302,9 @@ class _ActivityRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  activity.subtitle?.trim().isNotEmpty == true
-                      ? activity.subtitle!
-                      : _MoneyFormatters.activityTime(activity.createdAt),
+                  subtitle?.trim().isNotEmpty == true
+                      ? subtitle!
+                      : _MoneyFormatters.activityTime(activity.createdAt, l10n),
                   style: const TextStyle(
                     color: AppColors.onSurfaceVariant,
                     fontSize: 11,
@@ -1324,7 +1328,7 @@ class _ActivityRow extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                activity.tag,
+                tag,
                 style: const TextStyle(
                   color: AppColors.onSurfaceVariant,
                   fontSize: 10,
@@ -1337,6 +1341,217 @@ class _ActivityRow extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _localizedTitle(AppLocalizations l10n) {
+    switch (activity.type) {
+      case 'deposit_requested':
+        return l10n.tr('Deposit Request Submitted');
+      case 'deposit_approved':
+        return l10n.tr('Deposit Approved');
+      case 'deposit_rejected':
+        return l10n.tr('Deposit Rejected');
+      case 'withdrawal_requested':
+        return l10n.tr('Withdrawal Request Submitted');
+      case 'withdrawal_approved':
+        return l10n.tr('Withdrawal Approved');
+      case 'withdrawal_rejected':
+        return l10n.tr('Withdrawal Rejected');
+      case 'signal_activated':
+        final asset = _extractSuffixAfterColon(activity.title);
+        return l10n.tr(
+          'Signal Activated: {asset}',
+          params: <String, String>{'asset': asset.isNotEmpty ? asset : 'SIGNAL'},
+        );
+      case 'referral_rewarded':
+        final user = _localizedUserLabel(_extractSuffixAfterColon(activity.title), l10n);
+        return l10n.tr(
+          'Referral Rewarded: {user}',
+          params: <String, String>{'user': user},
+        );
+      case 'referral_qualified':
+        final user = _localizedUserLabel(_extractSuffixAfterColon(activity.title), l10n);
+        return l10n.tr(
+          'Referral Qualified: {user}',
+          params: <String, String>{'user': user},
+        );
+      case 'referral_joined':
+        final user = _localizedUserLabel(_extractSuffixAfterColon(activity.title), l10n);
+        return l10n.tr(
+          'Referral Joined: {user}',
+          params: <String, String>{'user': user},
+        );
+      default:
+        return l10n.tr(activity.title);
+    }
+  }
+
+  String? _localizedSubtitle(AppLocalizations l10n) {
+    final subtitle = activity.subtitle?.trim();
+    if (subtitle == null || subtitle.isEmpty) {
+      return null;
+    }
+
+    switch (activity.type) {
+      case 'deposit_requested':
+        final ref = _extractValueAfterPrefix(subtitle, 'Reference:');
+        if (ref != null) {
+          return l10n.tr(
+            'Reference: {value}',
+            params: <String, String>{'value': ref},
+          );
+        }
+        if (_matchesExact(subtitle, 'Awaiting admin review')) {
+          return l10n.tr('Awaiting admin review');
+        }
+        return subtitle;
+      case 'deposit_approved':
+        if (_matchesExact(subtitle, 'Funds were credited to your wallet')) {
+          return l10n.tr('Funds were credited to your wallet');
+        }
+        return subtitle;
+      case 'deposit_rejected':
+        if (_matchesExact(subtitle, 'Request was rejected by admin')) {
+          return l10n.tr('Request was rejected by admin');
+        }
+        return subtitle;
+      case 'withdrawal_requested':
+        final destination = _extractValueAfterPrefix(subtitle, 'Destination:');
+        if (destination != null) {
+          return l10n.tr(
+            'Destination: {value}',
+            params: <String, String>{'value': destination},
+          );
+        }
+        if (_matchesExact(subtitle, 'Awaiting admin approval')) {
+          return l10n.tr('Awaiting admin approval');
+        }
+        return subtitle;
+      case 'withdrawal_approved':
+        if (_matchesExact(subtitle, 'Funds were debited from your wallet')) {
+          return l10n.tr('Funds were debited from your wallet');
+        }
+        return subtitle;
+      case 'withdrawal_rejected':
+        if (_matchesExact(subtitle, 'Request was rejected by admin')) {
+          return l10n.tr('Request was rejected by admin');
+        }
+        return subtitle;
+      case 'signal_activated':
+        final percent = _extractPercentValue(subtitle);
+        if (percent != null) {
+          return l10n.tr(
+            'Target +{percent}% before expiry',
+            params: <String, String>{'percent': percent},
+          );
+        }
+        return subtitle;
+      case 'referral_rewarded':
+        if (_matchesExact(subtitle, 'Referral bonus has been credited')) {
+          return l10n.tr('Referral bonus has been credited');
+        }
+        return subtitle;
+      case 'referral_qualified':
+        if (_matchesExact(subtitle, 'Deposit requirement completed')) {
+          return l10n.tr('Deposit requirement completed');
+        }
+        return subtitle;
+      case 'referral_joined':
+        if (_matchesExact(subtitle, 'Awaiting qualifying deposit')) {
+          return l10n.tr('Awaiting qualifying deposit');
+        }
+        return subtitle;
+      default:
+        return l10n.tr(subtitle);
+    }
+  }
+
+  String _localizedTag(AppLocalizations l10n) {
+    switch (activity.type) {
+      case 'deposit_requested':
+        return l10n.tr('DEPOSIT');
+      case 'deposit_approved':
+        return l10n.tr('Approved');
+      case 'deposit_rejected':
+        return l10n.tr('Rejected');
+      case 'withdrawal_requested':
+        return l10n.tr('WITHDRAW');
+      case 'withdrawal_approved':
+        return l10n.tr('Approved');
+      case 'withdrawal_rejected':
+        return l10n.tr('Rejected');
+      case 'signal_activated':
+        return l10n.tr('SIGNAL');
+      case 'referral_rewarded':
+        return l10n.tr('REWARD');
+      case 'referral_qualified':
+        return l10n.tr('QUALIFIED');
+      case 'referral_joined':
+        return l10n.tr('REFERRAL');
+      default:
+        return l10n.tr(activity.tag);
+    }
+  }
+
+  String _extractSuffixAfterColon(String value) {
+    final index = value.indexOf(':');
+    if (index < 0 || index >= value.length - 1) {
+      return '';
+    }
+    return value.substring(index + 1).trim();
+  }
+
+  String? _extractValueAfterPrefix(String value, String prefix) {
+    if (!value.startsWith(prefix)) {
+      return null;
+    }
+
+    final extracted = value.substring(prefix.length).trim();
+    if (extracted.isEmpty) {
+      return null;
+    }
+
+    return extracted;
+  }
+
+  String _localizedUserLabel(String raw, AppLocalizations l10n) {
+    if (raw.isEmpty) {
+      return l10n.tr('Not available');
+    }
+
+    final userMatch = RegExp(
+      r'^User\s*#\s*(\d+)$',
+      caseSensitive: false,
+    ).firstMatch(raw);
+    if (userMatch == null) {
+      return raw;
+    }
+
+    return l10n.tr(
+      'User #{id}',
+      params: <String, String>{'id': userMatch.group(1)!},
+    );
+  }
+
+  String? _extractPercentValue(String value) {
+    final match = RegExp(r'([+-]?\d+(?:\.\d+)?)\s*%').firstMatch(value);
+    if (match == null) {
+      return null;
+    }
+
+    final parsed = double.tryParse(match.group(1)!);
+    if (parsed == null) {
+      return match.group(1);
+    }
+
+    final fixed = parsed.toStringAsFixed(2);
+    return fixed
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
+  bool _matchesExact(String value, String expected) {
+    return value.trim().toLowerCase() == expected.toLowerCase();
   }
 }
 
@@ -1447,7 +1662,7 @@ class _MoneyFormatters {
     return normalized;
   }
 
-  static String activityTime(DateTime createdAt) {
+  static String activityTime(DateTime createdAt, AppLocalizations l10n) {
     final local = createdAt.toLocal();
     final now = DateTime.now();
     final isToday =
@@ -1456,7 +1671,10 @@ class _MoneyFormatters {
         local.day == now.day;
 
     if (isToday) {
-      return 'Today, ${_timeFormat.format(local)}';
+      return l10n.tr(
+        'Today, {time}',
+        params: <String, String>{'time': _timeFormat.format(local)},
+      );
     }
 
     return _dateTimeFormat.format(local);

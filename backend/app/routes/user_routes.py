@@ -311,6 +311,12 @@ async def _build_recent_activities(
     )
     for entry, asset in signal_entries_result.all():
         label = (asset or "Signal").upper()
+        profit_amount: Decimal | None = None
+        if entry.participation_amount is not None and entry.profit_percent is not None:
+            participation = Decimal(str(entry.participation_amount))
+            percent = Decimal(str(entry.profit_percent))
+            profit_amount = (participation * percent) / Decimal("100")
+
         activities.append(
             HomeRecentActivityResponse(
                 id=f"signal:{entry.id}:activated",
@@ -319,7 +325,11 @@ async def _build_recent_activities(
                 subtitle=(
                     f"Target +{entry.profit_percent:.2f}% before expiry"
                 ),
-                amount=entry.participation_amount,
+                amount=(
+                    profit_amount
+                    if profit_amount is not None
+                    else entry.participation_amount
+                ),
                 is_positive=True,
                 tag="SIGNAL",
                 created_at=entry.started_at,
