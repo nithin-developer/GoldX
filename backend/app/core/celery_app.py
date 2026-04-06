@@ -2,8 +2,15 @@ from celery import Celery
 
 celery_app = Celery(
     "goldx",
-    broker="redis://localhost:6380/0",
-    backend="redis://localhost:6380/0",
+    # Local Redis (for development)
+
+    # broker="redis://localhost:6380/0",
+    # backend="redis://localhost:6380/0",    
+
+    # Production Redis (on VPS)
+    
+    broker="redis://localhost:6379/0",
+    backend="redis://localhost:6379/0",
 )
 
 # IMPORTANT: auto-discover tasks
