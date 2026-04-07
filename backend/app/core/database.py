@@ -102,6 +102,45 @@ def _apply_int_mapping(
     )
 
 
+def _apply_int_mapping_with_temporary_values(
+    sync_conn,
+    table_name: str,
+    column_name: str,
+    id_mapping: list[tuple[int, int]],
+) -> None:
+    """Apply integer remapping in two phases to avoid unique-key collisions.
+
+    Example: remapping {3->2, 4->3} can fail under immediate uniqueness checks
+    when done in-place. We first map old ids to guaranteed-free temporary ids,
+    then map temporary ids to final targets.
+    """
+    if not id_mapping:
+        return
+
+    quoted_table = _quote_identifier(table_name)
+    quoted_column = _quote_identifier(column_name)
+    min_value = sync_conn.execute(
+        text(f"SELECT COALESCE(MIN({quoted_column}), 0) FROM {quoted_table}")
+    ).scalar()
+
+    safe_floor = int(min_value or 0)
+    temp_start = min(safe_floor, 0) - len(id_mapping) - 10
+
+    temp_mapping: list[tuple[int, int]] = []
+    next_temp = temp_start
+    for old_id, _ in id_mapping:
+        temp_mapping.append((old_id, next_temp))
+        next_temp += 1
+
+    _apply_int_mapping(sync_conn, table_name, column_name, temp_mapping)
+
+    final_mapping = [
+        (temp_id, new_id)
+        for (_, temp_id), (_, new_id) in zip(temp_mapping, id_mapping)
+    ]
+    _apply_int_mapping(sync_conn, table_name, column_name, final_mapping)
+
+
 def _get_user_fk_references(inspector, table_names: set[str]) -> list[dict]:
     references: list[dict] = []
 
@@ -331,7 +370,7 @@ def _ensure_user_ids_and_invite_codes(sync_conn) -> None:
         if "referred_by" in user_column_names:
             _apply_int_mapping(sync_conn, "users", "referred_by", id_mapping)
 
-        _apply_int_mapping(sync_conn, "users", "id", id_mapping)
+        _apply_int_mapping_with_temporary_values(sync_conn, "users", "id", id_mapping)
 
         if dialect_name == "postgresql":
             _add_user_fk_constraints(sync_conn, fk_references)
