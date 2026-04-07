@@ -363,7 +363,19 @@ def _ensure_signal_public_ids(sync_conn) -> None:
             text("ALTER TABLE signals ADD COLUMN vip_only BOOLEAN DEFAULT FALSE")
         )
 
+    if "duration_unit" not in signal_columns:
+        sync_conn.execute(
+            text("ALTER TABLE signals ADD COLUMN duration_unit VARCHAR(10) DEFAULT 'hours'")
+        )
+
     sync_conn.execute(text("UPDATE signals SET vip_only = FALSE WHERE vip_only IS NULL"))
+    sync_conn.execute(
+        text(
+            "UPDATE signals "
+            "SET duration_unit = 'hours' "
+            "WHERE duration_unit IS NULL OR LOWER(duration_unit) NOT IN ('hours', 'minutes')"
+        )
+    )
 
     rows = sync_conn.execute(
         text("SELECT id FROM signals WHERE public_id IS NULL OR public_id = ''")

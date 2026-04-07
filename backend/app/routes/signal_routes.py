@@ -21,7 +21,7 @@ async def get_signals(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all currently active signals."""
-    signals = await signal_service.get_active_signals(db)
+    signals = await signal_service.get_active_signals(db, user_id=current_user.id)
     return [SignalResponse.model_validate(s) for s in signals]
 
 
@@ -34,7 +34,12 @@ async def get_all_signals(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all signals from DB for authenticated users (optionally filtered by status)."""
-    signals = await signal_service.get_all_signals(db, skip, limit)
+    signals = await signal_service.get_all_signals(
+        db,
+        skip,
+        limit,
+        user_id=current_user.id,
+    )
 
     if status is not None:
         normalized = status.strip().lower()
@@ -50,14 +55,15 @@ async def activate_signal(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Activate a signal using a unique signal code.
+    Activate a signal using a signal code.
 
     Flow:
-    1. Validate code exists and is not used
+    1. Validate code exists
     2. Check code has not expired
-    3. Verify user has minimum $100 wallet balance
-    4. Create signal entry with user's current balance
-    5. Mark code as used
+    3. Verify signal is active and user is eligible
+    4. Ensure user has not already activated that signal
+    5. Verify user has minimum $100 wallet balance
+    6. Create signal entry with user's current balance
     """
     entry = await signal_service.activate_signal(current_user, data.signal_code, db)
     return UserSignalEntryResponse.model_validate(entry)

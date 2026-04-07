@@ -48,6 +48,7 @@ type SignalFormState = {
   direction: string;
   profit_percent: string;
   duration_hours: string;
+  duration_unit: 'hours' | 'minutes';
   vip_only: boolean;
 };
 
@@ -56,6 +57,7 @@ const initialForm: SignalFormState = {
   direction: 'buy',
   profit_percent: '75',
   duration_hours: '24',
+  duration_unit: 'hours',
   vip_only: false,
 };
 
@@ -63,6 +65,7 @@ export function SignalsView() {
   const queryClient = useQueryClient();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createConfirmOpen, setCreateConfirmOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [deleteSignalId, setDeleteSignalId] = useState<string | null>(null);
   const [codeResult, setCodeResult] = useState<SignalCodeResponse | null>(null);
@@ -91,7 +94,13 @@ export function SignalsView() {
       queryClient.invalidateQueries({ queryKey: ['signals'] });
       setDeleteSignalId(null);
     },
-    onError: () => toast.error('Failed to delete signal'),
+    onError: (error: unknown) => {
+      const detail =
+        typeof error === 'object' && error !== null
+          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : undefined;
+      toast.error(detail ?? 'Failed to delete signal');
+    },
   });
 
   const codeMutation = useMutation({
@@ -109,19 +118,46 @@ export function SignalsView() {
       direction: form.direction,
       profit_percent: Number(form.profit_percent),
       duration_hours: Number(form.duration_hours),
+      duration_unit: form.duration_unit,
       vip_only: form.vip_only,
     };
 
     if (
       !payload.asset ||
       Number.isNaN(payload.profit_percent) ||
-      Number.isNaN(payload.duration_hours)
+      Number.isNaN(payload.duration_hours) ||
+      !Number.isInteger(payload.duration_hours) ||
+      payload.duration_hours <= 0
     ) {
       toast.error('Please fill all signal fields correctly');
       return;
     }
 
     createMutation.mutate(payload);
+  };
+
+  const onRequestCreateSignal = () => {
+    const payload: CreateSignalPayload = {
+      asset: form.asset.trim(),
+      direction: form.direction,
+      profit_percent: Number(form.profit_percent),
+      duration_hours: Number(form.duration_hours),
+      duration_unit: form.duration_unit,
+      vip_only: form.vip_only,
+    };
+
+    if (
+      !payload.asset ||
+      Number.isNaN(payload.profit_percent) ||
+      Number.isNaN(payload.duration_hours) ||
+      !Number.isInteger(payload.duration_hours) ||
+      payload.duration_hours <= 0
+    ) {
+      toast.error('Please fill all signal fields correctly');
+      return;
+    }
+
+    setCreateConfirmOpen(true);
   };
 
   const signals: SignalData[] = data ?? [];
@@ -139,6 +175,11 @@ export function SignalsView() {
   };
 
   const isSignalExpired = (signal: SignalData) => {
+    const normalizedStatus = signal.status.toLowerCase();
+    if (normalizedStatus === 'expired' || normalizedStatus === 'completed') {
+      return true;
+    }
+
     if (!signal.created_at) {
       return false;
     }
@@ -147,8 +188,12 @@ export function SignalsView() {
       return false;
     }
     const now = new Date();
-    const expiresAt = new Date(createdAt.getTime() + signal.duration_hours * 60 * 60 * 1000);
-    console.log({ signal, createdAt, expiresAt, now, expired: now > expiresAt });
+    const unit = (signal.duration_unit ?? 'hours').toLowerCase() === 'minutes' ? 'minutes' : 'hours';
+    const durationMs =
+      unit === 'minutes'
+        ? signal.duration_hours * 60 * 1000
+        : signal.duration_hours * 60 * 60 * 1000;
+    const expiresAt = new Date(createdAt.getTime() + durationMs);
     return now > expiresAt;
   };
 
@@ -188,7 +233,7 @@ export function SignalsView() {
                 <TableCell>Asset</TableCell>
                 <TableCell>Direction</TableCell>
                 <TableCell>Profit %</TableCell>
-                <TableCell>Duration (h)</TableCell>
+                <TableCell>Duration</TableCell>
                 <TableCell>Access</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Created At</TableCell>
@@ -212,47 +257,67 @@ export function SignalsView() {
                 </TableRow>
               )}
 
-              {signals.map((signal) => (
-                <TableRow key={signal.id} hover>
-                  <TableCell>{signal.asset}</TableCell>
-                  <TableCell>{signal.direction.toUpperCase()}</TableCell>
-                  <TableCell>{signal.profit_percent}%</TableCell>
-                  <TableCell>{signal.duration_hours}</TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      color={signal.vip_only ? 'warning' : 'default'}
-                      label={signal.vip_only ? 'VIP Only' : 'All Users'}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      color={isSignalExpired(signal) ? 'error' : 'success'}
-                      label={isSignalExpired(signal) ? 'Expired' : 'Active'}
-                    />
-                  </TableCell>
-                  <TableCell>{formatCreatedAt(signal.created_at)}</TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button
+              {signals.map((signal) => {
+                const activatedUsersCount = Number(signal.activated_users_count ?? 0);
+                const durationUnit =
+                  (signal.duration_unit ?? 'hours').toLowerCase() === 'minutes'
+                    ? 'minutes'
+                    : 'hours';
+                const durationLabel =
+                  durationUnit === 'minutes'
+                    ? `${signal.duration_hours}m`
+                    : `${signal.duration_hours}h`;
+                const expired = isSignalExpired(signal);
+                const deleteDisabled = activatedUsersCount > 0 && !expired;
+
+                return (
+                  <TableRow key={signal.id} hover>
+                    <TableCell>{signal.asset}</TableCell>
+                    <TableCell>{signal.direction.toUpperCase()}</TableCell>
+                    <TableCell>{signal.profit_percent}%</TableCell>
+                    <TableCell>{durationLabel}</TableCell>
+                    <TableCell>
+                      <Chip
                         size="small"
-                        variant="outlined"
-                        onClick={() => codeMutation.mutate(signal.id)}
-                        disabled={codeMutation.isPending}
-                      >
-                        Show Code
-                      </Button>
-                      <IconButton
-                        color="error"
-                        onClick={() => setDeleteSignalId(signal.id)}
-                      >
-                        <Iconify icon="solar:trash-bin-trash-bold" />
-                      </IconButton>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        color={signal.vip_only ? 'warning' : 'default'}
+                        label={signal.vip_only ? 'VIP Only' : 'All Users'}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        color={expired ? 'error' : 'success'}
+                        label={expired ? 'Expired' : 'Active'}
+                      />
+                    </TableCell>
+                    <TableCell>{formatCreatedAt(signal.created_at)}</TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => codeMutation.mutate(signal.id)}
+                          disabled={codeMutation.isPending}
+                        >
+                          Show Code
+                        </Button>
+                        <IconButton
+                          color="error"
+                          onClick={() => setDeleteSignalId(signal.id)}
+                          disabled={deleteDisabled || deleteMutation.isPending}
+                          title={
+                            deleteDisabled
+                              ? 'Cannot delete until signal expires because users have already activated it'
+                              : 'Delete signal'
+                          }
+                        >
+                          <Iconify icon="solar:trash-bin-trash-bold" />
+                        </IconButton>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -308,14 +373,35 @@ export function SignalsView() {
                 setForm((prev) => ({ ...prev, profit_percent: event.target.value }))
               }
             />
-            <TextField
-              type="number"
-              label="Duration Hours"
-              value={form.duration_hours}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, duration_hours: event.target.value }))
-              }
-            />
+            <Stack direction="row" spacing={2}>
+              <TextField
+                fullWidth
+                type="number"
+                label={form.duration_unit === 'minutes' ? 'Duration Minutes' : 'Duration Hours'}
+                value={form.duration_hours}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, duration_hours: event.target.value }))
+                }
+              />
+              <FormControl fullWidth>
+                <InputLabel id="duration-unit-label">Duration Unit</InputLabel>
+                <Select
+                  labelId="duration-unit-label"
+                  label="Duration Unit"
+                  value={form.duration_unit}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      duration_unit: (String(event.target.value) as 'hours' | 'minutes'),
+                    }))
+                  }
+                >
+                  <MenuItem value="hours">Hours</MenuItem>
+                  <MenuItem value="minutes">Minutes</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
             <FormControlLabel
               control={
                 <Switch
@@ -331,11 +417,29 @@ export function SignalsView() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={onCreateSignal} disabled={createMutation.isPending}>
+          <Button
+            variant="contained"
+            onClick={onRequestCreateSignal}
+            disabled={createMutation.isPending}
+          >
             {createMutation.isPending ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmDialog
+        open={createConfirmOpen}
+        onClose={() => setCreateConfirmOpen(false)}
+        onConfirm={() => {
+          setCreateConfirmOpen(false);
+          onCreateSignal();
+        }}
+        title="Confirm Signal Creation"
+        content="Once any user activates this signal, it cannot be deleted until the signal expires."
+        confirmText="Create Signal"
+        confirmColor="warning"
+        isPending={createMutation.isPending}
+      />
 
       <Dialog open={codeOpen} onClose={() => setCodeOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Generated Signal Code</DialogTitle>
@@ -352,7 +456,7 @@ export function SignalsView() {
                 Expires at: {expiresAtLabel}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Usage: {codeResult.used ? 'Already used' : 'Not used yet'}
+                Activated users: {codeResult.activated_users_count}
               </Typography>
             </Stack>
           )}

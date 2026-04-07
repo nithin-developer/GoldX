@@ -375,7 +375,7 @@ class _DepositHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final status = _statusVisual(item.status, l10n);
-    final totalReward = item.selfRewardAmount + item.referrerRewardAmount;
+    final totalReward = item.selfRewardAmount;
 
     return GlassCard(
       onTap: onTap,

@@ -176,6 +176,7 @@ class AppLocalizations {
     'Expected Profit': 'الربح المتوقع',
     'Duration': 'المدة',
     'Activate Signal': 'تفعيل الإشارة',
+    'Already Activated': 'مفعّلة بالفعل',
     'Activation Unavailable': 'التفعيل غير متاح',
     'VIP Only': 'VIP فقط',
     'This signal is available for VIP users only':

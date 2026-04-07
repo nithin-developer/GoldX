@@ -45,6 +45,11 @@ class SignalHistoryItem {
       return signalItem.durationLabel;
     }
 
+    final minutes = endsAt.difference(startedAt).inMinutes;
+    if (minutes < 60) {
+      return '${minutes > 0 ? minutes : 0}m';
+    }
+
     final hours = endsAt.difference(startedAt).inHours;
     return '${hours > 0 ? hours : 0}h';
   }

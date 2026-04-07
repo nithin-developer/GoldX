@@ -52,12 +52,12 @@ async def lifespan(app: FastAPI):
     await normalize_vip_and_referral_state()
 
     # Start background workers
-    profit_task = asyncio.create_task(start_background_workers())
+    # profit_task = asyncio.create_task(start_background_workers())
 
     yield
 
     # Shutdown
-    profit_task.cancel()
+    # profit_task.cancel()
     await close_db()
     logger.info("Trading Signals API shut down")
 

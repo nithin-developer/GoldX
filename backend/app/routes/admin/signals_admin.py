@@ -41,13 +41,15 @@ async def create_signal(
     - **asset**: Trading asset (e.g., BTC, ETH)
     - **direction**: 'long' or 'short'
     - **profit_percent**: Expected profit percentage
-    - **duration_hours**: Signal duration in hours
+    - **duration_hours**: Signal duration value
+    - **duration_unit**: 'hours' or 'minutes'
     """
     signal = await signal_service.create_signal(
         data.asset,
         data.direction,
         data.profit_percent,
         data.duration_hours,
+        data.duration_unit,
         data.vip_only,
         db,
     )

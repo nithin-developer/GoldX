@@ -91,6 +91,13 @@ class _SignalsPageState extends State<SignalsPage> {
     }
 
     final l10n = context.l10n;
+    if (signal.alreadyActivated) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.tr('Already Activated'))));
+      return;
+    }
+
     final isVipUser = (AuthScope.of(context).currentUser?.vipLevel ?? 0) > 0;
     if (signal.vipOnly && !isVipUser) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1054,7 +1061,11 @@ class _SignalCard extends StatelessWidget {
     final isVipUser = (AuthScope.of(context).currentUser?.vipLevel ?? 0) > 0;
     final isVipLocked = item.vipOnly && !isVipUser;
     final canActivate =
-        !isExpired && isLive && item.id.isNotEmpty && !isVipLocked;
+        !isExpired &&
+        isLive &&
+        item.id.isNotEmpty &&
+        !isVipLocked &&
+        !item.alreadyActivated;
     final directionColor = isLong ? AppColors.success : AppColors.danger;
     final statusColor = isExpired
         ? AppColors.danger
@@ -1157,6 +1168,8 @@ class _SignalCard extends StatelessWidget {
             label: Text(
               canActivate
                   ? l10n.tr('Activate Signal')
+                  : item.alreadyActivated
+                  ? l10n.tr('Already Activated')
                   : isVipLocked
                   ? l10n.tr('VIP Only')
                   : isExpired

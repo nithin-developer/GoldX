@@ -336,7 +336,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
           ],
           const SizedBox(height: 16),
           _InputField(
-            label: l10n.tr('DESTINATION ADDRESS / IBAN'),
+            label: l10n.tr('DESTINATION ADDRESS / USDT (TRC20 / ERC20)'),
             controller: _addressController,
             hint: l10n.tr('Enter wallet or bank details'),
             maxLines: 3,

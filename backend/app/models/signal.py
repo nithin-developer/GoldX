@@ -22,6 +22,7 @@ class Signal(Base):
     direction = Column(String(10), nullable=False)    # "long" or "short"
     profit_percent = Column(Float, nullable=False)
     duration_hours = Column(Integer, nullable=False)
+    duration_unit = Column(String(10), nullable=False, default="hours")
     status = Column(String(20), nullable=False, default="active")  # active, expired, completed
     vip_only = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -32,8 +33,20 @@ class Signal(Base):
     )
 
     # Relationships
-    codes = relationship("SignalCode", back_populates="signal", lazy="selectin")
-    entries = relationship("UserSignalEntry", back_populates="signal", lazy="selectin")
+    codes = relationship(
+        "SignalCode",
+        back_populates="signal",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    entries = relationship(
+        "UserSignalEntry",
+        back_populates="signal",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self):
         return f"<Signal(public_id={self.public_id}, asset={self.asset}, direction={self.direction})>"

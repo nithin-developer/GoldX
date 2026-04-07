@@ -8,8 +8,10 @@ export type SignalData = {
   direction: string;
   profit_percent: number;
   duration_hours: number;
+  duration_unit?: 'hours' | 'minutes';
   status: string;
   vip_only: boolean;
+  activated_users_count?: number;
   created_at?: string;
 };
 
@@ -18,6 +20,7 @@ export type CreateSignalPayload = {
   direction: string;
   profit_percent: number;
   duration_hours: number;
+  duration_unit: 'hours' | 'minutes';
   vip_only: boolean;
 };
 
@@ -26,7 +29,7 @@ export type SignalCodeResponse = {
   signal_id?: string;
   code: string;
   expires_at: string;
-  used?: boolean;
+  activated_users_count: number;
   created_at?: string;
 };
 
@@ -55,6 +58,9 @@ export const signalService = {
       throw new Error('Invalid signal code response');
     }
 
-    return resolved;
+    return {
+      ...resolved,
+      activated_users_count: Number(resolved.activated_users_count ?? 0),
+    };
   },
 };
