@@ -9,6 +9,7 @@ import { authService } from 'src/services/auth.service';
 type AuthUser = {
   email: string;
   role: string;
+  full_name?: string | null;
 };
 
 type AuthContextType = {
@@ -27,7 +28,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('access_token'));
   const [user, setUser] = useState<AuthUser | null>(() => {
     const stored = localStorage.getItem('admin_user');
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(stored) as Partial<AuthUser>;
+      if (!parsed?.email || !parsed?.role) {
+        return null;
+      }
+
+      return {
+        email: parsed.email,
+        role: parsed.role,
+        full_name: parsed.full_name ?? null,
+      };
+    } catch {
+      return null;
+    }
   });
 
   const login = useCallback(async (email: string, password: string) => {
@@ -37,11 +55,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Access denied. Admin role required.');
     }
 
+    const authUser: AuthUser = {
+      email: response.email,
+      role: response.role,
+      full_name: response.full_name ?? null,
+    };
+
     localStorage.setItem('access_token', response.access_token);
-    localStorage.setItem('admin_user', JSON.stringify({ email, role: response.role }));
+    localStorage.setItem('admin_user', JSON.stringify(authUser));
 
     setToken(response.access_token);
-    setUser({ email, role: response.role });
+    setUser(authUser);
   }, []);
 
   const logout = useCallback(() => {

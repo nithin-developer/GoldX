@@ -257,7 +257,7 @@ async def generate_signal_codes(
         )
 
     expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
-    code_str = f"{signal.asset}{uuid.uuid4().hex[:6].upper()}"
+    code_str = f"{uuid.uuid4().hex[:6].upper()}"
     code = SignalCode(
         signal_id=signal.id,
         code=code_str,

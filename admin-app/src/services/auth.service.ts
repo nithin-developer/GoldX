@@ -12,6 +12,8 @@ export type LoginPayload = {
 export type LoginResponse = {
   access_token: string;
   refresh_token?: string;
+  email: string;
+  full_name?: string | null;
   role: string;
 };
 
@@ -21,6 +23,8 @@ type ErrorPayload = {
 };
 
 type UserProfileResponse = {
+  email: string;
+  full_name?: string | null;
   role: string;
 };
 
@@ -53,6 +57,8 @@ export const authService = {
     return {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
+      email: me.data.email,
+      full_name: me.data.full_name,
       role: me.data.role,
     };
   },

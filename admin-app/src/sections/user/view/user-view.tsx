@@ -70,12 +70,20 @@ function getAvatarInitial(user: UserData) {
   return source.charAt(0).toUpperCase();
 }
 
+const DEFAULT_RESET_PASSWORD = 'GoldX@1234';
+
+type PasswordResetAction = {
+  user: UserData;
+  kind: 'login' | 'withdrawal';
+};
+
 export function UserView() {
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+  const [passwordResetAction, setPasswordResetAction] = useState<PasswordResetAction | null>(null);
 
   const normalizedSearch = searchQuery.trim();
 
@@ -104,6 +112,31 @@ export function UserView() {
       toast.error(getApiErrorMessage(error, 'Failed to delete user'));
     },
   });
+
+  const resetLoginPasswordMutation = useMutation({
+    mutationFn: (id: number) => userService.resetLoginPassword(id),
+    onSuccess: (response) => {
+      toast.success(response.message || 'Login password reset successfully');
+      setPasswordResetAction(null);
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to reset login password'));
+    },
+  });
+
+  const resetWithdrawalPasswordMutation = useMutation({
+    mutationFn: (id: number) => userService.resetWithdrawalPassword(id),
+    onSuccess: (response) => {
+      toast.success(response.message || 'Withdrawal password reset successfully');
+      setPasswordResetAction(null);
+    },
+    onError: (error) => {
+      toast.error(getApiErrorMessage(error, 'Failed to reset withdrawal password'));
+    },
+  });
+
+  const isAnyPasswordResetPending =
+    resetLoginPasswordMutation.isPending || resetWithdrawalPasswordMutation.isPending;
 
   const users = (data ?? []).filter((user) => user.email !== 'admin@tradingsignals.com');
 
@@ -338,11 +371,84 @@ export function UserView() {
                     />
                   </Stack>
                 </Box>
+
+                <Box
+                  sx={(theme) => ({
+                    p: 2,
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.divider}`,
+                  })}
+                >
+                  <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                    Security Actions
+                  </Typography>
+                  <Divider sx={{ my: 1.25 }} />
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      startIcon={<Iconify icon="solar:restart-bold" />}
+                      onClick={() =>
+                        setPasswordResetAction({
+                          user: selectedUser,
+                          kind: 'login',
+                        })
+                      }
+                      disabled={isAnyPasswordResetPending}
+                    >
+                      Reset Login Password
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      startIcon={<Iconify icon="solar:restart-bold" />}
+                      onClick={() =>
+                        setPasswordResetAction({
+                          user: selectedUser,
+                          kind: 'withdrawal',
+                        })
+                      }
+                      disabled={isAnyPasswordResetPending}
+                    >
+                      Reset Withdraw Password
+                    </Button>
+                  </Stack>
+                </Box>
               </Stack>
             </DialogContent>
           </>
         )}
       </Dialog>
+
+      <ConfirmDialog
+        open={passwordResetAction !== null}
+        onClose={() => setPasswordResetAction(null)}
+        onConfirm={() => {
+          if (!passwordResetAction) {
+            return;
+          }
+
+          if (passwordResetAction.kind === 'login') {
+            resetLoginPasswordMutation.mutate(passwordResetAction.user.id);
+            return;
+          }
+
+          resetWithdrawalPasswordMutation.mutate(passwordResetAction.user.id);
+        }}
+        title={
+          passwordResetAction?.kind === 'login'
+            ? 'Reset Login Password'
+            : 'Reset Withdraw Password'
+        }
+        content={
+          passwordResetAction
+            ? `Are you sure you want to reset the ${passwordResetAction.kind === 'login' ? 'login' : 'withdraw'} password for ${passwordResetAction.user.email || `User ${passwordResetAction.user.id}`}? New password: ${DEFAULT_RESET_PASSWORD}`
+            : ''
+        }
+        confirmText="Confirm Reset"
+        confirmColor="warning"
+        isPending={isAnyPasswordResetPending}
+      />
 
       <ConfirmDialog
         open={deleteUserId !== null}

@@ -24,8 +24,8 @@ export function SignInView() {
   const { login } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('admin@tradingsignals.com');
-  const [password, setPassword] = useState('123456789');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

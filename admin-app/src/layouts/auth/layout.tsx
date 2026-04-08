@@ -8,7 +8,7 @@ import Alert from '@mui/material/Alert';
 
 import { RouterLink } from 'src/routes/components';
 
-import { Logo } from 'src/components/logo';
+import Logo from 'src/assets/logo.png';
 
 import { AuthContent } from './content';
 import { MainSection } from '../core/main-section';
@@ -51,8 +51,7 @@ export function AuthLayout({
       ),
       leftArea: (
         <>
-          {/** @slot Logo */}
-          <Logo />
+          <img src={Logo} alt="Logo" style={{ width: '10%', marginRight: 8 }} />
         </>
       ),
       rightArea: (

@@ -38,6 +38,10 @@ export type UserReferralItem = {
   created_at: string;
 };
 
+type MessageResponse = {
+  message: string;
+};
+
 export const userService = {
   getUsers: async (params?: GetUsersParams): Promise<UserData[]> => {
     const { data } = await api.get<UserData[]>('/admin/users', {
@@ -56,8 +60,14 @@ export const userService = {
     return data;
   },
 
-  resetWithdrawalPassword: async (id: number): Promise<void> => {
-    await api.post(`/admin/users/${id}/reset-withdrawal-password`);
+  resetLoginPassword: async (id: number): Promise<MessageResponse> => {
+    const { data } = await api.post<MessageResponse>(`/admin/users/${id}/reset-login-password`);
+    return data;
+  },
+
+  resetWithdrawalPassword: async (id: number): Promise<MessageResponse> => {
+    const { data } = await api.post<MessageResponse>(`/admin/users/${id}/reset-withdrawal-password`);
+    return data;
   },
 
   getUserReferrals: async (id: number): Promise<UserReferralItem[]> => {

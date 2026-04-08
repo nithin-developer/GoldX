@@ -20,6 +20,7 @@ from app.services import wallet_service
 
 
 router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
+DEFAULT_RESET_PASSWORD = "GoldX@1234"
 
 
 def _build_admin_user_response(
@@ -255,11 +256,32 @@ async def reset_withdrawal_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     # Hash the default password and set it as the withdrawal password
-    default_password = "GoldX@1234"
-    user.withdrawal_password_hash = hash_password(default_password)
+    user.withdrawal_password_hash = hash_password(DEFAULT_RESET_PASSWORD)
 
     await db.flush()
-    return MessageResponse(message=f"Withdrawal password reset to {default_password}")
+    return MessageResponse(message=f"Withdrawal password reset to {DEFAULT_RESET_PASSWORD}")
+
+
+@router.post("/{user_id}/reset-login-password", response_model=MessageResponse)
+async def reset_login_password(
+    user_id: Annotated[int, Path(ge=1000000, le=9999999)],
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset a user's login password to GoldX@1234 (admin only).
+    """
+    from fastapi import HTTPException
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password_hash = hash_password(DEFAULT_RESET_PASSWORD)
+
+    await db.flush()
+    return MessageResponse(message=f"Login password reset to {DEFAULT_RESET_PASSWORD}")
 
 
 @router.delete("/{user_id}", response_model=MessageResponse)

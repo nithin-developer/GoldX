@@ -170,6 +170,10 @@ async def get_deposit_settings(
     settings_data = await wallet_service.get_or_create_deposit_settings(db)
     base_url = str(request.base_url).rstrip("/")
 
+    # Force HTTPS in production
+    if base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
+
     return DepositSettingsResponse(
         currency=settings_data.currency,
         network=settings_data.network,
