@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:signalpro/app/models/auth_tokens.dart';
 import 'package:signalpro/app/models/user_profile.dart';
+import 'package:signalpro/app/services/app_data_api.dart';
 import 'package:signalpro/app/services/api_client.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 import 'package:signalpro/app/services/auth_api.dart';
@@ -11,8 +12,8 @@ enum AuthStatus { checking, authenticated, unauthenticated }
 
 class AuthController extends ChangeNotifier implements AuthSessionDelegate {
   AuthController({AuthApi? authApi, TokenStorage? tokenStorage})
-      : _authApi = authApi ?? AuthApi(),
-        _tokenStorage = tokenStorage ?? TokenStorage() {
+    : _authApi = authApi ?? AuthApi(),
+      _tokenStorage = tokenStorage ?? TokenStorage() {
     apiClient = ApiClient(authSessionDelegate: this);
   }
 
@@ -44,6 +45,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     if (storedTokens == null) {
       _tokens = null;
       _currentUser = null;
+      AppDataApi.clearAllCaches();
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return;
@@ -52,11 +54,21 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     _tokens = storedTokens;
     final restored = await _syncSessionWithServer();
 
+    if (!restored) {
+      _tokens = null;
+      _currentUser = null;
+      AppDataApi.clearAllCaches();
+      await _tokenStorage.clear();
+    }
+
     _status = restored ? AuthStatus.authenticated : AuthStatus.unauthenticated;
     notifyListeners();
   }
 
-  Future<String?> login({required String email, required String password}) async {
+  Future<String?> login({
+    required String email,
+    required String password,
+  }) async {
     _isSubmitting = true;
     notifyListeners();
 
@@ -64,6 +76,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
       final tokens = await _authApi.login(email: email, password: password);
       _tokens = tokens;
       await _tokenStorage.saveTokens(tokens);
+      AppDataApi.clearAllCaches();
       _currentUser = await _fetchMeWithClient();
       _status = AuthStatus.authenticated;
       return null;
@@ -95,6 +108,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
       );
       _tokens = tokens;
       await _tokenStorage.saveTokens(tokens);
+      AppDataApi.clearAllCaches();
       _currentUser = await _fetchMeWithClient();
       _status = AuthStatus.authenticated;
       return null;
@@ -110,6 +124,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     _tokens = null;
     _currentUser = null;
     _status = AuthStatus.unauthenticated;
+    AppDataApi.clearAllCaches();
     await _tokenStorage.clear();
     notifyListeners();
   }
@@ -175,13 +190,16 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     }
 
     try {
-      final updatedTokens = await _authApi.refreshToken(refreshToken: refreshToken);
+      final updatedTokens = await _authApi.refreshToken(
+        refreshToken: refreshToken,
+      );
       _tokens = updatedTokens;
       await _tokenStorage.saveTokens(updatedTokens);
       return true;
     } on ApiException {
       _tokens = null;
       _currentUser = null;
+      AppDataApi.clearAllCaches();
       await _tokenStorage.clear();
       return false;
     }
@@ -194,7 +212,9 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
 
   Future<UserProfile> _fetchMeWithClient() async {
     try {
-      final response = await apiClient.dio.get<Map<String, dynamic>>('/auth/me');
+      final response = await apiClient.dio.get<Map<String, dynamic>>(
+        '/auth/me',
+      );
       return UserProfile.fromJson(response.data!);
     } on DioException catch (error) {
       throw mapDioError(error);

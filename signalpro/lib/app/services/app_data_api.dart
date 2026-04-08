@@ -20,6 +20,17 @@ class AppDataApi {
   static int? _unreadNotificationsCache;
   static HomeDashboardData? _homeDashboardCache;
 
+  static void clearAllCaches() {
+    _signalCache.clear();
+    _signalHistoryCache = null;
+    _referralStatsCache = null;
+    _referralsCache.clear();
+    _notificationsCache = null;
+    _profileCache = null;
+    _unreadNotificationsCache = null;
+    _homeDashboardCache = null;
+  }
+
   String _signalsCacheKey(String? status) {
     final normalized = status?.trim();
     if (normalized == null || normalized.isEmpty) {
