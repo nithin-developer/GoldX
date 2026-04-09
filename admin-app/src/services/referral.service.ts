@@ -1,4 +1,4 @@
-import api from './api';
+import api, { type PaginatedResponse } from './api';
 
 // ----------------------------------------------------------------------
 
@@ -17,14 +17,33 @@ export type VipUserData = {
   referrals_count: number;
 };
 
+export type GetReferralListParams = {
+  skip?: number;
+  limit?: number;
+};
+
 export const referralService = {
-  getReferrals: async (): Promise<ReferralData[]> => {
-    const { data } = await api.get<ReferralData[]>('/admin/referrals');
+  getReferrals: async (
+    params?: GetReferralListParams
+  ): Promise<PaginatedResponse<ReferralData>> => {
+    const { data } = await api.get<PaginatedResponse<ReferralData>>('/admin/referrals', {
+      params: {
+        skip: params?.skip,
+        limit: params?.limit,
+      },
+    });
     return data;
   },
 
-  getVipUsers: async (): Promise<VipUserData[]> => {
-    const { data } = await api.get<VipUserData[]>('/admin/vip-users');
+  getVipUsers: async (
+    params?: GetReferralListParams
+  ): Promise<PaginatedResponse<VipUserData>> => {
+    const { data } = await api.get<PaginatedResponse<VipUserData>>('/admin/vip-users', {
+      params: {
+        skip: params?.skip,
+        limit: params?.limit,
+      },
+    });
     return data;
   },
 };

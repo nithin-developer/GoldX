@@ -1,5 +1,5 @@
 import { toast } from 'react-hot-toast';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -25,6 +25,7 @@ import {
   DialogContent,
   DialogActions,
   TableContainer,
+  TablePagination,
   CircularProgress,
 } from '@mui/material';
 
@@ -71,16 +72,24 @@ export function DepositsView() {
   const queryClient = useQueryClient();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedDeposit, setSelectedDeposit] = useState<AdminDeposit | null>(null);
   const [adminNote, setAdminNote] = useState('');
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['admin-deposits', statusFilter],
-    queryFn: () => walletAdminService.getDeposits(statusFilter),
+    queryKey: ['admin-deposits', statusFilter, page, rowsPerPage],
+    queryFn: () =>
+      walletAdminService.getDeposits({
+        status: statusFilter,
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+      }),
   });
 
-  const deposits = useMemo(() => data ?? [], [data]);
+  const deposits = useMemo(() => data?.items ?? [], [data]);
+  const totalDeposits = data?.total ?? 0;
 
   const approveMutation = useMutation({
     mutationFn: (payload: { id: string; note?: string }) =>
@@ -114,6 +123,15 @@ export function DepositsView() {
   const isPendingAction = approveMutation.isPending || rejectMutation.isPending;
   const canTakeAction = selectedDeposit?.status?.toLowerCase() === 'pending';
 
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   return (
     <DashboardContent>
       <Stack
@@ -131,7 +149,10 @@ export function DepositsView() {
             labelId="deposit-status-filter"
             label="Status"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+            onChange={(event) => {
+              setStatusFilter(event.target.value as StatusFilter);
+              setPage(0);
+            }}
           >
             <MenuItem value="all">All</MenuItem>
             <MenuItem value="pending">Pending</MenuItem>
@@ -201,6 +222,16 @@ export function DepositsView() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          component="div"
+          page={page}
+          count={totalDeposits}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          rowsPerPageOptions={[5, 10, 25]}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Card>
 
       <Dialog open={Boolean(selectedDeposit)} onClose={onCloseModal} fullWidth maxWidth="sm">

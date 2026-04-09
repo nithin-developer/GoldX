@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Body, Depends, Query
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin
+from app.models.signal import Signal
 from app.models.user import User
 from app.schemas.signal_schema import (
     SignalResponse,
@@ -10,6 +12,7 @@ from app.schemas.signal_schema import (
     SignalCodeResponse,
     GenerateCodeRequest,
 )
+from app.schemas.common_schema import PaginatedResponse
 from app.schemas.auth_schema import MessageResponse
 from app.services import signal_service
 
@@ -17,7 +20,7 @@ from app.services import signal_service
 router = APIRouter(prefix="/admin/signals", tags=["Admin - Signals"])
 
 
-@router.get("", response_model=list[SignalResponse])
+@router.get("", response_model=PaginatedResponse[SignalResponse])
 async def list_signals(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -25,8 +28,15 @@ async def list_signals(
     db: AsyncSession = Depends(get_db),
 ):
     """List all signals (admin only)."""
+    total_result = await db.execute(select(func.count(Signal.id)))
+    total = int(total_result.scalar_one() or 0)
     signals = await signal_service.get_all_signals(db, skip, limit)
-    return [SignalResponse.model_validate(s) for s in signals]
+    return PaginatedResponse[SignalResponse](
+        items=[SignalResponse.model_validate(s) for s in signals],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.post("", response_model=SignalResponse, status_code=201)

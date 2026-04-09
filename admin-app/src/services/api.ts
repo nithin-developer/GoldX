@@ -4,6 +4,15 @@ import { CONFIG } from 'src/config-global';
 
 // ----------------------------------------------------------------------
 
+export type PaginatedResponse<T> = {
+  items: T[];
+  total: number;
+  skip: number;
+  limit: number;
+};
+
+// ----------------------------------------------------------------------
+
 const api = axios.create({
   baseURL: CONFIG.apiUrl,
   headers: {

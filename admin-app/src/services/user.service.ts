@@ -1,4 +1,4 @@
-import api from './api';
+import api, { type PaginatedResponse } from './api';
 
 // ----------------------------------------------------------------------
 
@@ -43,8 +43,8 @@ type MessageResponse = {
 };
 
 export const userService = {
-  getUsers: async (params?: GetUsersParams): Promise<UserData[]> => {
-    const { data } = await api.get<UserData[]>('/admin/users', {
+  getUsers: async (params?: GetUsersParams): Promise<PaginatedResponse<UserData>> => {
+    const { data } = await api.get<PaginatedResponse<UserData>>('/admin/users', {
       params: {
         search: params?.search?.trim() || undefined,
         role: params?.role,

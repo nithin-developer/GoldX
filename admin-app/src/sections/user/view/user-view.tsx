@@ -1,5 +1,5 @@
 import { toast } from 'react-hot-toast';
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { alpha } from '@mui/material/styles';
@@ -8,9 +8,9 @@ import {
   Card,
   Chip,
   Alert,
-  Avatar,
   Stack,
   Table,
+  Avatar,
   Button,
   Dialog,
   Divider,
@@ -24,6 +24,7 @@ import {
   DialogContent,
   InputAdornment,
   TableContainer,
+  TablePagination,
   CircularProgress,
 } from '@mui/material';
 
@@ -81,6 +82,8 @@ export function UserView() {
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
   const [passwordResetAction, setPasswordResetAction] = useState<PasswordResetAction | null>(null);
@@ -88,11 +91,13 @@ export function UserView() {
   const normalizedSearch = searchQuery.trim();
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['users', normalizedSearch],
+    queryKey: ['users', normalizedSearch, page, rowsPerPage],
     queryFn: () =>
       userService.getUsers({
         search: normalizedSearch || undefined,
-        limit: 100,
+        role: 'user',
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
       }),
   });
 
@@ -138,7 +143,17 @@ export function UserView() {
   const isAnyPasswordResetPending =
     resetLoginPasswordMutation.isPending || resetWithdrawalPasswordMutation.isPending;
 
-  const users = (data ?? []).filter((user) => user.email !== 'admin@tradingsignals.com');
+  const users = data?.items ?? [];
+  const totalUsers = data?.total ?? 0;
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   return (
     <DashboardContent>
@@ -146,7 +161,10 @@ export function UserView() {
         <Typography variant="h4">Users</Typography>
         <TextField
           value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
+          onChange={(event) => {
+            setSearchQuery(event.target.value);
+            setPage(0);
+          }}
           placeholder="Search by User ID, username, email, or wallet address"
           size="small"
           sx={{ width: { xs: '100%', sm: 420 } }}
@@ -197,7 +215,7 @@ export function UserView() {
 
                 return (
                   <TableRow key={user.id} hover>
-                    <TableCell>{index + 1}</TableCell>
+                    <TableCell>{page * rowsPerPage + index + 1}</TableCell>
                     <TableCell>{user.email ?? '-'}</TableCell>
                     <TableCell>{getDisplayName(user)}</TableCell>
                     <TableCell>
@@ -229,6 +247,16 @@ export function UserView() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          component="div"
+          page={page}
+          count={totalUsers}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          rowsPerPageOptions={[5, 10, 25]}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Card>
 
       <Dialog

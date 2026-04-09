@@ -1,19 +1,20 @@
 from typing import List
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin
 from app.models.user import User
 from app.models.notification import Notification
 from app.schemas.auth_schema import MessageResponse
+from app.schemas.common_schema import PaginatedResponse
 from app.schemas.notification_schema import NotificationResponse
 
 
 router = APIRouter(prefix="/admin/notifications", tags=["Admin - Notifications"])
 
 
-@router.get("", response_model=List[NotificationResponse])
+@router.get("", response_model=PaginatedResponse[NotificationResponse])
 async def list_notifications(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -23,10 +24,18 @@ async def list_notifications(
     """
     List all notifications (admin only).
     """
+    total_result = await db.execute(select(func.count(Notification.id)))
+    total = int(total_result.scalar_one() or 0)
+
     query = select(Notification).order_by(Notification.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     notifications = result.scalars().all()
-    return [NotificationResponse.model_validate(n) for n in notifications]
+    return PaginatedResponse[NotificationResponse](
+        items=[NotificationResponse.model_validate(n) for n in notifications],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.delete("/{notification_id}", response_model=MessageResponse)

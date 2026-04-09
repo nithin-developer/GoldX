@@ -15,6 +15,7 @@ from app.schemas.user_schema import (
     AdminUserUpdate,
     AdminUserReferralItemResponse,
 )
+from app.schemas.common_schema import PaginatedResponse
 from app.schemas.auth_schema import MessageResponse
 from app.services import wallet_service
 
@@ -53,7 +54,7 @@ def _build_admin_user_response(
     )
 
 
-@router.get("", response_model=list[UserListResponse])
+@router.get("", response_model=PaginatedResponse[UserListResponse])
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -102,8 +103,16 @@ async def list_users(
         .outerjoin(wallet_agg, wallet_agg.c.wallet_user_id == User.id)
     )
 
+    count_query = (
+        select(func.count(User.id))
+        .select_from(User)
+        .outerjoin(referral_agg, referral_agg.c.referrer_id == User.id)
+        .outerjoin(wallet_agg, wallet_agg.c.wallet_user_id == User.id)
+    )
+
     if role:
         query = query.where(User.role == role)
+        count_query = count_query.where(User.role == role)
 
     if search:
         normalized_search = search.strip()
@@ -119,20 +128,28 @@ async def list_users(
                 filters.append(User.id == int(normalized_search))
 
             query = query.where(or_(*filters))
+            count_query = count_query.where(or_(*filters))
 
     query = query.order_by(User.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     rows = result.all()
+    total_result = await db.execute(count_query)
+    total = int(total_result.scalar_one() or 0)
 
-    return [
-        _build_admin_user_response(
-            user=row[0],
-            wallet_address=row.wallet_address,
-            referral_count=int(row.referral_count or 0),
-            referral_total_deposits=row.referral_total_deposits,
-        )
-        for row in rows
-    ]
+    return PaginatedResponse[UserListResponse](
+        items=[
+            _build_admin_user_response(
+                user=row[0],
+                wallet_address=row.wallet_address,
+                referral_count=int(row.referral_count or 0),
+                referral_total_deposits=row.referral_total_deposits,
+            )
+            for row in rows
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get("/{user_id}", response_model=UserListResponse)

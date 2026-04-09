@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState, type ChangeEvent } from 'react';
 
 import {
   Card,
@@ -11,6 +12,7 @@ import {
   TableHead,
   Typography,
   TableContainer,
+  TablePagination,
   CircularProgress,
 } from '@mui/material';
 
@@ -20,12 +22,29 @@ import { referralService } from 'src/services/referral.service';
 // ----------------------------------------------------------------------
 
 export function VipView() {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['vip-users'],
-    queryFn: referralService.getVipUsers,
+    queryKey: ['vip-users', page, rowsPerPage],
+    queryFn: () =>
+      referralService.getVipUsers({
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+      }),
   });
 
-  const users = data ?? [];
+  const users = data?.items ?? [];
+  const totalUsers = data?.total ?? 0;
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   return (
     <DashboardContent>
@@ -78,6 +97,16 @@ export function VipView() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          component="div"
+          page={page}
+          count={totalUsers}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          rowsPerPageOptions={[5, 10, 25]}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Card>
     </DashboardContent>
   );

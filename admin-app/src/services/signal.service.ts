@@ -1,4 +1,4 @@
-import api from './api';
+import api, { type PaginatedResponse } from './api';
 
 // ----------------------------------------------------------------------
 
@@ -24,6 +24,11 @@ export type CreateSignalPayload = {
   vip_only: boolean;
 };
 
+export type GetSignalsParams = {
+  skip?: number;
+  limit?: number;
+};
+
 export type SignalCodeResponse = {
   id?: number;
   signal_id?: string;
@@ -36,8 +41,13 @@ export type SignalCodeResponse = {
 type SignalCodeApiResponse = SignalCodeResponse | SignalCodeResponse[];
 
 export const signalService = {
-  getSignals: async (): Promise<SignalData[]> => {
-    const { data } = await api.get<SignalData[]>('/admin/signals');
+  getSignals: async (params?: GetSignalsParams): Promise<PaginatedResponse<SignalData>> => {
+    const { data } = await api.get<PaginatedResponse<SignalData>>('/admin/signals', {
+      params: {
+        skip: params?.skip,
+        limit: params?.limit,
+      },
+    });
     return data;
   },
 

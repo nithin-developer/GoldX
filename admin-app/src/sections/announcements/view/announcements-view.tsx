@@ -1,7 +1,7 @@
 import type { AxiosError } from 'axios';
 
-import { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { useState, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -16,6 +16,7 @@ import {
   TextField,
   Typography,
   ListItemText,
+  TablePagination,
   CircularProgress,
 } from '@mui/material';
 
@@ -30,11 +31,29 @@ export function AnnouncementsView() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [durationHours, setDurationHours] = useState('24');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['announcements'],
-    queryFn: notificationService.getAnnouncements,
+    queryKey: ['announcements', page, rowsPerPage],
+    queryFn: () =>
+      notificationService.getAnnouncements({
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+      }),
   });
+
+  const announcements = data?.items ?? [];
+  const totalAnnouncements = data?.total ?? 0;
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const mutation = useMutation({
     mutationFn: notificationService.createAnnouncement,
@@ -114,7 +133,7 @@ export function AnnouncementsView() {
 
           {!isLoading && !isError && (
             <List>
-              {(data ?? []).map((item) => (
+              {announcements.map((item) => (
                 <ListItem key={item.id} divider>
                   <ListItemText
                     primary={item.title}
@@ -130,13 +149,23 @@ export function AnnouncementsView() {
                 </ListItem>
               ))}
 
-              {(data ?? []).length === 0 && (
+              {announcements.length === 0 && (
                 <ListItem>
                   <ListItemText primary="No announcements yet." />
                 </ListItem>
               )}
             </List>
           )}
+
+          <TablePagination
+            component="div"
+            page={page}
+            count={totalAnnouncements}
+            rowsPerPage={rowsPerPage}
+            onPageChange={handleChangePage}
+            rowsPerPageOptions={[5, 10, 25]}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
         </Card>
       </Stack>
     </DashboardContent>

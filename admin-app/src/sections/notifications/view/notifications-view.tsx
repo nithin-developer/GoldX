@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { useState, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -20,12 +20,13 @@ import {
   InputLabel,
   FormControl,
   TableContainer,
+  TablePagination,
   CircularProgress,
 } from '@mui/material';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { getApiErrorMessage } from 'src/services/auth.service';
-import { notificationService, type NotificationData } from 'src/services/notification.service';
+import { notificationService } from 'src/services/notification.service';
 
 import { ConfirmDialog } from 'src/components/confirm-dialog';
 
@@ -35,6 +36,8 @@ export function NotificationsView() {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [target, setTarget] = useState('all');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [deleteNotificationId, setDeleteNotificationId] = useState<number | null>(null);
 
   const queryClient = useQueryClient();
@@ -47,15 +50,32 @@ export function NotificationsView() {
       setTitle('');
       setMessage('');
       setTarget('all');
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
     onError: () => toast.error('Failed to send notification'),
   });
 
   // For managing notifications
-  const { data: notifications, isLoading, isError } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: notificationService.getNotifications,
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['notifications', page, rowsPerPage],
+    queryFn: () =>
+      notificationService.getNotifications({
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+      }),
   });
+
+  const notifications = data?.items ?? [];
+  const totalNotifications = data?.total ?? 0;
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const deleteMutation = useMutation({
     mutationFn: notificationService.deleteNotification,
@@ -141,7 +161,7 @@ export function NotificationsView() {
                 </TableRow>
               )}
 
-              {!isLoading && (!notifications || notifications.length === 0) && (
+              {!isLoading && notifications.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center">
                     No notifications found.
@@ -149,7 +169,7 @@ export function NotificationsView() {
                 </TableRow>
               )}
 
-              {notifications && notifications.map((notification) => (
+              {notifications.map((notification) => (
                 <TableRow key={notification.id} hover>
                   <TableCell>{notification.title}</TableCell>
                   <TableCell>{notification.message}</TableCell>
@@ -178,6 +198,16 @@ export function NotificationsView() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          component="div"
+          page={page}
+          count={totalNotifications}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          rowsPerPageOptions={[5, 10, 25]}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Card>
 
       <ConfirmDialog

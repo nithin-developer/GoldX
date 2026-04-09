@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState, type ChangeEvent } from 'react';
 
 import {
   Card,
@@ -11,6 +12,7 @@ import {
   TableHead,
   Typography,
   TableContainer,
+  TablePagination,
   CircularProgress,
 } from '@mui/material';
 
@@ -20,12 +22,29 @@ import { referralService } from 'src/services/referral.service';
 // ----------------------------------------------------------------------
 
 export function ReferralsView() {
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['referrals'],
-    queryFn: referralService.getReferrals,
+    queryKey: ['referrals', page, rowsPerPage],
+    queryFn: () =>
+      referralService.getReferrals({
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+      }),
   });
 
-  const referrals = data ?? [];
+  const referrals = data?.items ?? [];
+  const totalReferrals = data?.total ?? 0;
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   return (
     <DashboardContent>
@@ -80,6 +99,16 @@ export function ReferralsView() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          component="div"
+          page={page}
+          count={totalReferrals}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          rowsPerPageOptions={[5, 10, 25]}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Card>
     </DashboardContent>
   );

@@ -1,4 +1,4 @@
-import api from './api';
+import api, { type PaginatedResponse } from './api';
 
 // ----------------------------------------------------------------------
 
@@ -42,6 +42,12 @@ export type UpdateDepositSettingsPayload = {
   qr_code?: File;
 };
 
+export type GetAdminListParams = {
+  status?: string;
+  skip?: number;
+  limit?: number;
+};
+
 const buildStatusParams = (status?: string) => {
   if (!status || status === 'all') {
     return undefined;
@@ -50,10 +56,16 @@ const buildStatusParams = (status?: string) => {
   return { status };
 };
 
+const buildListParams = (params?: GetAdminListParams) => ({
+  ...buildStatusParams(params?.status),
+  skip: params?.skip,
+  limit: params?.limit,
+});
+
 export const walletAdminService = {
-  getDeposits: async (status = 'all'): Promise<AdminDeposit[]> => {
-    const { data } = await api.get<AdminDeposit[]>('/admin/deposits', {
-      params: buildStatusParams(status),
+  getDeposits: async (params?: GetAdminListParams): Promise<PaginatedResponse<AdminDeposit>> => {
+    const { data } = await api.get<PaginatedResponse<AdminDeposit>>('/admin/deposits', {
+      params: buildListParams(params),
     });
     return data;
   },
@@ -72,9 +84,11 @@ export const walletAdminService = {
     return data;
   },
 
-  getWithdrawals: async (status = 'all'): Promise<AdminWithdrawal[]> => {
-    const { data } = await api.get<AdminWithdrawal[]>('/admin/withdrawals', {
-      params: buildStatusParams(status),
+  getWithdrawals: async (
+    params?: GetAdminListParams
+  ): Promise<PaginatedResponse<AdminWithdrawal>> => {
+    const { data } = await api.get<PaginatedResponse<AdminWithdrawal>>('/admin/withdrawals', {
+      params: buildListParams(params),
     });
     return data;
   },

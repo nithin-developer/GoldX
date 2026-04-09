@@ -18,6 +18,21 @@ class ReferralResponse(BaseModel):
         from_attributes = True
 
 
+class AdminReferralListItemResponse(BaseModel):
+    id: int
+    referrer: str
+    referred_user: str
+    deposit: float
+    status: str
+
+
+class AdminVipUserListItemResponse(BaseModel):
+    id: int
+    email: str
+    vip_level: int
+    referrals_count: int
+
+
 class ReferralStatsResponse(BaseModel):
     total_referrals: int
     qualified_referrals: int

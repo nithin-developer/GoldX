@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { useState, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -26,6 +26,7 @@ import {
   DialogActions,
   DialogContent,
   TableContainer,
+  TablePagination,
   CircularProgress,
   FormControlLabel,
 } from '@mui/material';
@@ -69,11 +70,17 @@ export function SignalsView() {
   const [codeOpen, setCodeOpen] = useState(false);
   const [deleteSignalId, setDeleteSignalId] = useState<string | null>(null);
   const [codeResult, setCodeResult] = useState<SignalCodeResponse | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [form, setForm] = useState<SignalFormState>(initialForm);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['signals'],
-    queryFn: signalService.getSignals,
+    queryKey: ['signals', page, rowsPerPage],
+    queryFn: () =>
+      signalService.getSignals({
+        skip: page * rowsPerPage,
+        limit: rowsPerPage,
+      }),
   });
 
   const createMutation = useMutation({
@@ -160,7 +167,18 @@ export function SignalsView() {
     setCreateConfirmOpen(true);
   };
 
-  const signals: SignalData[] = data ?? [];
+  const signals: SignalData[] = data?.items ?? [];
+  const totalSignals = data?.total ?? 0;
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   const formatCreatedAt = (value?: string) => {
     if (!value) {
       return '--';
@@ -321,6 +339,16 @@ export function SignalsView() {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <TablePagination
+          component="div"
+          page={page}
+          count={totalSignals}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          rowsPerPageOptions={[5, 10, 25]}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Card>
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="sm">

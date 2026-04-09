@@ -1,4 +1,4 @@
-import api from './api';
+import api, { type PaginatedResponse } from './api';
 
 // ----------------------------------------------------------------------
 
@@ -31,6 +31,15 @@ export type AnnouncementData = {
   duration_hours: number;
   created_at: string;
   expires_at: string;
+};
+
+export type GetNotificationListParams = {
+  skip?: number;
+  limit?: number;
+};
+
+export type GetAnnouncementListParams = GetNotificationListParams & {
+  active_only?: boolean;
 };
 
 type AnnouncementApiResponse = {
@@ -78,13 +87,32 @@ export const notificationService = {
     return mapAnnouncement(data);
   },
 
-  getAnnouncements: async (): Promise<AnnouncementData[]> => {
-    const { data } = await api.get<AnnouncementApiResponse[]>('/admin/announcements');
-    return (data ?? []).map(mapAnnouncement);
+  getAnnouncements: async (
+    params?: GetAnnouncementListParams
+  ): Promise<PaginatedResponse<AnnouncementData>> => {
+    const { data } = await api.get<PaginatedResponse<AnnouncementApiResponse>>('/admin/announcements', {
+      params: {
+        active_only: params?.active_only,
+        skip: params?.skip,
+        limit: params?.limit,
+      },
+    });
+
+    return {
+      ...data,
+      items: (data.items ?? []).map(mapAnnouncement),
+    };
   },
 
-  getNotifications: async (): Promise<NotificationData[]> => {
-    const { data } = await api.get<NotificationData[]>('/admin/notifications');
+  getNotifications: async (
+    params?: GetNotificationListParams
+  ): Promise<PaginatedResponse<NotificationData>> => {
+    const { data } = await api.get<PaginatedResponse<NotificationData>>('/admin/notifications', {
+      params: {
+        skip: params?.skip,
+        limit: params?.limit,
+      },
+    });
     return data;
   },
 

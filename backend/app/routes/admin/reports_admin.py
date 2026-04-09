@@ -11,12 +11,14 @@ from app.models.wallet import Deposit, Withdrawal
 from app.models.signal import Signal
 from app.models.notification import Notification, Announcement
 from app.models.referral import Referral
+from app.schemas.common_schema import PaginatedResponse
 from app.schemas.notification_schema import (
     ReportResponse,
     CreateNotificationRequest,
-    NotificationResponse,
     CreateAnnouncementRequest,
     AnnouncementResponse,
+    AdminReferralListItemResponse,
+    AdminVipUserListItemResponse,
 )
 from app.schemas.wallet_schema import (
     DepositResponse,
@@ -141,7 +143,7 @@ async def get_reports(
 
 
 # --- Deposit Management ---
-@router.get("/deposits", response_model=list[DepositResponse])
+@router.get("/deposits", response_model=PaginatedResponse[DepositResponse])
 async def list_all_deposits(
     request: Request,
     status: str = Query(None, pattern="^(pending|approved|rejected)$"),
@@ -152,13 +154,24 @@ async def list_all_deposits(
 ):
     """List all deposits with optional status filter (admin only)."""
     query = select(Deposit)
+    count_query = select(func.count(Deposit.id))
     if status:
         query = query.where(Deposit.status == status)
+        count_query = count_query.where(Deposit.status == status)
+
+    total_result = await db.execute(count_query)
+    total = int(total_result.scalar_one() or 0)
+
     query = query.order_by(Deposit.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     deposits = result.scalars().all()
     base_url = str(request.base_url).rstrip("/")
-    return [_build_deposit_response(d, base_url) for d in deposits]
+    return PaginatedResponse[DepositResponse](
+        items=[_build_deposit_response(d, base_url) for d in deposits],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.put("/deposits/{deposit_id}/approve", response_model=DepositResponse)
@@ -190,7 +203,7 @@ async def reject_deposit(
 
 
 # --- Withdrawal Management ---
-@router.get("/withdrawals", response_model=list[WithdrawalResponse])
+@router.get("/withdrawals", response_model=PaginatedResponse[WithdrawalResponse])
 async def list_all_withdrawals(
     status: str = Query(None, pattern="^(pending|approved|rejected)$"),
     skip: int = Query(0, ge=0),
@@ -200,12 +213,23 @@ async def list_all_withdrawals(
 ):
     """List all withdrawals with optional status filter (admin only)."""
     query = select(Withdrawal)
+    count_query = select(func.count(Withdrawal.id))
     if status:
         query = query.where(Withdrawal.status == status)
+        count_query = count_query.where(Withdrawal.status == status)
+
+    total_result = await db.execute(count_query)
+    total = int(total_result.scalar_one() or 0)
+
     query = query.order_by(Withdrawal.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     withdrawals = result.scalars().all()
-    return [_build_withdrawal_response(w) for w in withdrawals]
+    return PaginatedResponse[WithdrawalResponse](
+        items=[_build_withdrawal_response(w) for w in withdrawals],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.put("/withdrawals/{withdrawal_id}/approve", response_model=WithdrawalResponse)
@@ -280,27 +304,40 @@ async def send_notification(
 
 
 # --- Announcements ---
-@router.get("/announcements", response_model=list[AnnouncementResponse])
+@router.get("/announcements", response_model=PaginatedResponse[AnnouncementResponse])
 async def list_announcements(
     active_only: bool = Query(True),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """List all announcements (admin only)."""
     query = select(Announcement)
+    count_query = select(func.count(Announcement.id))
 
     if active_only:
         now = datetime.now(timezone.utc)
-        query = query.where(
+        active_filters = (
             Announcement.is_active == True,  # noqa: E712
             (Announcement.start_date == None) | (Announcement.start_date <= now),  # noqa: E711
             (Announcement.end_date == None) | (Announcement.end_date >= now),  # noqa: E711
         )
+        query = query.where(*active_filters)
+        count_query = count_query.where(*active_filters)
 
-    query = query.order_by(Announcement.created_at.desc())
+    total_result = await db.execute(count_query)
+    total = int(total_result.scalar_one() or 0)
+
+    query = query.order_by(Announcement.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     announcements = result.scalars().all()
-    return [AnnouncementResponse.model_validate(a) for a in announcements]
+    return PaginatedResponse[AnnouncementResponse](
+        items=[AnnouncementResponse.model_validate(a) for a in announcements],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.post("/announcements", response_model=AnnouncementResponse, status_code=201)
@@ -322,14 +359,23 @@ async def create_announcement(
 
 
 # --- Referrals / VIP (Admin UI compatibility) ---
-@router.get("/referrals", response_model=list[dict])
+@router.get("/referrals", response_model=PaginatedResponse[AdminReferralListItemResponse])
 async def list_referrals_admin(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """List all referral records for the admin referrals page."""
     referrer_user = aliased(User)
     referred_user = aliased(User)
+
+    total_result = await db.execute(
+        select(func.count(Referral.id))
+        .join(referrer_user, Referral.referrer_id == referrer_user.id)
+        .join(referred_user, Referral.referred_user_id == referred_user.id)
+    )
+    total = int(total_result.scalar_one() or 0)
 
     result = await db.execute(
         select(
@@ -342,22 +388,31 @@ async def list_referrals_admin(
         .join(referrer_user, Referral.referrer_id == referrer_user.id)
         .join(referred_user, Referral.referred_user_id == referred_user.id)
         .order_by(Referral.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
 
-    return [
-        {
-            "id": row.id,
-            "referrer": row.referrer_email,
-            "referred_user": row.referred_email,
-            "deposit": float(row.deposit_amount or Decimal("0")),
-            "status": row.status,
-        }
-        for row in result.all()
-    ]
+    return PaginatedResponse[AdminReferralListItemResponse](
+        items=[
+            AdminReferralListItemResponse(
+                id=row.id,
+                referrer=row.referrer_email,
+                referred_user=row.referred_email,
+                deposit=float(row.deposit_amount or Decimal("0")),
+                status=row.status,
+            )
+            for row in result.all()
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
-@router.get("/vip-users", response_model=list[dict])
+@router.get("/vip-users", response_model=PaginatedResponse[AdminVipUserListItemResponse])
 async def list_vip_users_admin(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
@@ -371,6 +426,11 @@ async def list_vip_users_admin(
         .subquery()
     )
 
+    total_result = await db.execute(
+        select(func.count(User.id)).where(User.role == "user", User.vip_level > 0)
+    )
+    total = int(total_result.scalar_one() or 0)
+
     result = await db.execute(
         select(
             User.id,
@@ -383,16 +443,23 @@ async def list_vip_users_admin(
         .outerjoin(referral_count_subquery, referral_count_subquery.c.referrer_id == User.id)
         .where(User.role == "user", User.vip_level > 0)
         .order_by(User.vip_level.desc(), User.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
 
-    return [
-        {
-            "id": row.id,
-            "email": row.email,
-            "vip_level": row.vip_level,
-            "referrals_count": row.referrals_count,
-        }
-        for row in result.all()
-    ]
+    return PaginatedResponse[AdminVipUserListItemResponse](
+        items=[
+            AdminVipUserListItemResponse(
+                id=row.id,
+                email=row.email,
+                vip_level=row.vip_level,
+                referrals_count=row.referrals_count,
+            )
+            for row in result.all()
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
