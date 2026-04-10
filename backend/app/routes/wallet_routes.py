@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_verified_user
 from app.models.user import User
 from app.schemas.wallet_schema import (
     WalletResponse,
@@ -63,7 +63,7 @@ def _build_withdrawal_response(withdrawal) -> WithdrawalResponse:
 
 @router.get("", response_model=WalletResponse)
 async def get_wallet(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get wallet balance and pending amounts."""
@@ -75,7 +75,7 @@ async def get_wallet(
 async def get_transactions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get paginated wallet transaction history."""
@@ -89,7 +89,7 @@ async def create_deposit(
     amount: Decimal = Form(...),
     transaction_ref: str | None = Form(None),
     payment_proof: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -129,7 +129,7 @@ async def get_deposits(
         alias="status",
         pattern="^(pending|approved|rejected)$",
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get deposit history for the current user."""
@@ -148,7 +148,7 @@ async def get_deposits(
 async def get_deposit_details(
     request: Request,
     deposit_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single deposit record owned by the current user."""
@@ -212,7 +212,7 @@ async def get_deposit_qr_code(
 @router.post("/withdraw", response_model=WithdrawalResponse, status_code=201)
 async def create_withdrawal(
     data: WithdrawRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -237,7 +237,7 @@ async def get_withdrawals(
         alias="status",
         pattern="^(pending|approved|rejected)$",
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get withdrawal history for the current user."""
@@ -254,7 +254,7 @@ async def get_withdrawals(
 @router.get("/withdrawals/{withdrawal_id}", response_model=WithdrawalResponse)
 async def get_withdrawal_details(
     withdrawal_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single withdrawal record owned by the current user."""
@@ -269,7 +269,7 @@ async def get_withdrawal_details(
 @router.post("/set-withdrawal-password", response_model=MessageResponse)
 async def set_withdrawal_password(
     data: SetWithdrawalPasswordRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Set or update withdrawal password. Updating requires current password."""

@@ -23,6 +23,13 @@ class UserProfileResponse(BaseModel):
     capital_lock_days_remaining: int = 0
     vip_level: int
     has_withdrawal_password: bool = False
+    verification_status: str = "not_submitted"
+    verification_submitted_at: Optional[datetime] = None
+    verification_reviewed_at: Optional[datetime] = None
+    verification_rejection_reason: Optional[str] = None
+    verification_id_document_url: Optional[str] = None
+    verification_selfie_document_url: Optional[str] = None
+    verification_address_document_url: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -113,6 +120,13 @@ class UserListResponse(BaseModel):
     wallet_address: Optional[str] = None
     referral_count: int = 0
     referral_total_deposits: Decimal = Decimal("0")
+    verification_status: str = "not_submitted"
+    verification_submitted_at: Optional[datetime] = None
+    verification_reviewed_at: Optional[datetime] = None
+    verification_rejection_reason: Optional[str] = None
+    verification_id_document_url: Optional[str] = None
+    verification_selfie_document_url: Optional[str] = None
+    verification_address_document_url: Optional[str] = None
     created_at: datetime
 
     class Config:

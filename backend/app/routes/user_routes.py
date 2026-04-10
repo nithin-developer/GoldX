@@ -1,11 +1,11 @@
 from decimal import Decimal
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import aliased
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_verified_user
 from app.models.user import User
 from app.models.signal import Signal, UserSignalEntry
 from app.models.referral import Referral
@@ -19,15 +19,20 @@ from app.schemas.user_schema import (
     DashboardResponse,
 )
 from app.services import wallet_service
+from app.services import verification_service
+from app.schemas.verification_schema import VerificationStatusResponse
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.get("/profile", response_model=UserProfileResponse)
-async def get_profile(current_user: User = Depends(get_current_user)):
-    """Get the current user's full profile."""
+async def _build_user_profile_response(
+    current_user: User,
+    db: AsyncSession,
+    base_url: str,
+) -> UserProfileResponse:
     balance_breakdown = wallet_service.build_user_balance_breakdown(current_user)
+    verification = await verification_service.get_or_create_verification(current_user, db)
 
     return UserProfileResponse(
         id=current_user.id,
@@ -48,12 +53,77 @@ async def get_profile(current_user: User = Depends(get_current_user)):
         capital_lock_days_remaining=balance_breakdown["capital_lock_days_remaining"],
         vip_level=current_user.vip_level,
         has_withdrawal_password=current_user.withdrawal_password_hash is not None,
+        verification_status=verification_service.get_verification_status_value(
+            verification
+        ),
+        verification_submitted_at=verification.submitted_at,
+        verification_reviewed_at=verification.reviewed_at,
+        verification_rejection_reason=verification.rejection_reason,
+        verification_id_document_url=verification_service.build_verification_document_url(
+            current_user.id,
+            verification.id_document_filename,
+            base_url,
+        ),
+        verification_selfie_document_url=verification_service.build_verification_document_url(
+            current_user.id,
+            verification.address_document_filename,
+            base_url,
+        ),
+        verification_address_document_url=verification_service.build_verification_document_url(
+            current_user.id,
+            verification.address_document_filename,
+            base_url,
+        ),
         created_at=current_user.created_at,
     )
 
 
+def _build_verification_response(
+    user_id: int,
+    verification,
+    base_url: str,
+) -> VerificationStatusResponse:
+    return VerificationStatusResponse(
+        user_id=user_id,
+        status=verification_service.get_verification_status_value(verification),
+        id_document_url=verification_service.build_verification_document_url(
+            user_id,
+            verification.id_document_filename,
+            base_url,
+        ),
+        selfie_document_url=verification_service.build_verification_document_url(
+            user_id,
+            verification.address_document_filename,
+            base_url,
+        ),
+        address_document_url=verification_service.build_verification_document_url(
+            user_id,
+            verification.address_document_filename,
+            base_url,
+        ),
+        submitted_at=verification.submitted_at,
+        reviewed_at=verification.reviewed_at,
+        reviewed_by_admin_id=verification.reviewed_by_admin_id,
+        rejection_reason=verification.rejection_reason,
+        created_at=verification.created_at,
+        updated_at=verification.updated_at,
+    )
+
+
+@router.get("/profile", response_model=UserProfileResponse)
+async def get_profile(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the current user's full profile."""
+    base_url = str(request.base_url).rstrip("/")
+    return await _build_user_profile_response(current_user, db, base_url)
+
+
 @router.put("/update", response_model=UserProfileResponse)
 async def update_profile(
+    request: Request,
     data: UpdateProfileRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -66,29 +136,48 @@ async def update_profile(
 
     await db.flush()
 
-    balance_breakdown = wallet_service.build_user_balance_breakdown(current_user)
+    base_url = str(request.base_url).rstrip("/")
+    return await _build_user_profile_response(current_user, db, base_url)
 
-    return UserProfileResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        phone=current_user.phone,
-        role=current_user.role,
-        is_active=current_user.is_active,
-        invite_code=current_user.invite_code,
-        wallet_balance=balance_breakdown["balance"],
-        capital_balance=balance_breakdown["capital_balance"],
-        signal_profit_balance=balance_breakdown["signal_profit_balance"],
-        reward_balance=balance_breakdown["reward_balance"],
-        withdrawable_balance=balance_breakdown["withdrawable_balance"],
-        locked_capital_balance=balance_breakdown["locked_capital_balance"],
-        capital_lock_active=balance_breakdown["capital_lock_active"],
-        capital_lock_ends_at=balance_breakdown["capital_lock_ends_at"],
-        capital_lock_days_remaining=balance_breakdown["capital_lock_days_remaining"],
-        vip_level=current_user.vip_level,
-        has_withdrawal_password=current_user.withdrawal_password_hash is not None,
-        created_at=current_user.created_at,
+
+@router.get("/verification/status", response_model=VerificationStatusResponse)
+async def get_verification_status(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    verification = await verification_service.get_or_create_verification(current_user, db)
+    base_url = str(request.base_url).rstrip("/")
+    return _build_verification_response(current_user.id, verification, base_url)
+
+
+@router.post("/verification/submit", response_model=VerificationStatusResponse, status_code=201)
+async def submit_verification(
+    request: Request,
+    id_document: UploadFile = File(...),
+    selfie_document: UploadFile | None = File(None),
+    address_document: UploadFile | None = File(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    selected_selfie_document = selfie_document or address_document
+
+    if selected_selfie_document is None:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="selfie_document is required",
+        )
+
+    verification = await verification_service.submit_user_verification(
+        user=current_user,
+        id_document=id_document,
+        selfie_document=selected_selfie_document,
+        db=db,
     )
+    base_url = str(request.base_url).rstrip("/")
+    return _build_verification_response(current_user.id, verification, base_url)
 
 
 # --- Dashboard endpoint ---
@@ -389,7 +478,7 @@ async def _build_recent_activities(
 
 @dashboard_router.get("", response_model=DashboardResponse)
 async def get_dashboard(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """

@@ -16,6 +16,13 @@ export type UserData = {
   referral_count?: number | null;
   referral_total_deposits?: number | string | null;
   vip_level?: number | null;
+  verification_status?: 'not_submitted' | 'pending' | 'approved' | 'rejected' | null;
+  verification_submitted_at?: string | null;
+  verification_reviewed_at?: string | null;
+  verification_rejection_reason?: string | null;
+  verification_id_document_url?: string | null;
+  verification_selfie_document_url?: string | null;
+  verification_address_document_url?: string | null;
   is_active?: boolean;
   created_at?: string;
 };

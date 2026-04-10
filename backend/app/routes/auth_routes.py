@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -14,6 +14,7 @@ from app.schemas.auth_schema import (
 from app.schemas.user_schema import UserProfileResponse
 from app.services import auth_service
 from app.services import wallet_service
+from app.services import verification_service
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -71,11 +72,17 @@ async def refresh_token(data: RefreshTokenRequest, db: AsyncSession = Depends(ge
 
 
 @router.get("/me", response_model=UserProfileResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
     Get the current authenticated user's profile.
     """
     balance_breakdown = wallet_service.build_user_balance_breakdown(current_user)
+    verification = await verification_service.get_or_create_verification(current_user, db)
+    base_url = str(request.base_url).rstrip("/")
 
     return UserProfileResponse(
         id=current_user.id,
@@ -96,6 +103,27 @@ async def get_me(current_user: User = Depends(get_current_user)):
         capital_lock_days_remaining=balance_breakdown["capital_lock_days_remaining"],
         vip_level=current_user.vip_level,
         has_withdrawal_password=current_user.withdrawal_password_hash is not None,
+        verification_status=verification_service.get_verification_status_value(
+            verification
+        ),
+        verification_submitted_at=verification.submitted_at,
+        verification_reviewed_at=verification.reviewed_at,
+        verification_rejection_reason=verification.rejection_reason,
+        verification_id_document_url=verification_service.build_verification_document_url(
+            current_user.id,
+            verification.id_document_filename,
+            base_url,
+        ),
+        verification_selfie_document_url=verification_service.build_verification_document_url(
+            current_user.id,
+            verification.address_document_filename,
+            base_url,
+        ),
+        verification_address_document_url=verification_service.build_verification_document_url(
+            current_user.id,
+            verification.address_document_filename,
+            base_url,
+        ),
         created_at=current_user.created_at,
     )
 

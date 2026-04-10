@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_verified_user
 from app.models.user import User
 from app.schemas.signal_schema import (
     SignalResponse,
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/signals", tags=["Signals"])
 
 @router.get("", response_model=list[SignalResponse])
 async def get_signals(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get all currently active signals."""
@@ -30,7 +30,7 @@ async def get_all_signals(
     status: str | None = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get all signals from DB for authenticated users (optionally filtered by status)."""
@@ -51,7 +51,7 @@ async def get_all_signals(
 @router.post("/activate", response_model=UserSignalEntryResponse, status_code=201)
 async def activate_signal(
     data: ActivateSignalRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -73,7 +73,7 @@ async def activate_signal(
 async def get_signal_history(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the current user's signal participation history."""

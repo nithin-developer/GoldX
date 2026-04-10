@@ -1,4 +1,4 @@
-from app.models.user import User
+from app.models.user import User, UserVerification
 from app.models.signal import Signal, SignalCode, UserSignalEntry
 from app.models.wallet import WalletTransaction, Deposit, Withdrawal
 from app.models.system_settings import DepositWalletSetting
@@ -7,6 +7,7 @@ from app.models.notification import Notification, Announcement
 
 __all__ = [
     "User",
+    "UserVerification",
     "Signal",
     "SignalCode",
     "UserSignalEntry",

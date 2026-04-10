@@ -36,6 +36,11 @@ export const navData: NavItem[] = [
     icon: <Icon icon="solar:hand-money-outline" width={24} />,
   },
   {
+    title: 'Verifications',
+    path: '/verifications',
+    icon: <Icon icon="solar:shield-check-bold-duotone" width={24} />,
+  },
+  {
     title: 'Referrals',
     path: '/referrals',
     icon: <Icon icon="solar:users-group-two-rounded-bold-duotone" width={24} />,

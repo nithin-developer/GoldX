@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_verified_user
 from app.models.user import User
 from app.schemas.notification_schema import (
     ReferralResponse,
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/referrals", tags=["Referrals"])
 async def get_referrals(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get list of users referred by the current user."""
@@ -27,7 +27,7 @@ async def get_referrals(
 
 @router.get("/stats", response_model=ReferralStatsResponse)
 async def get_referral_stats(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """

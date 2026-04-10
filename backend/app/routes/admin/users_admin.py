@@ -1,13 +1,13 @@
 from decimal import Decimal
 from typing import Annotated
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import aliased
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin
 from app.core.security import hash_password
-from app.models.user import User
+from app.models.user import User, UserVerification
 from app.models.referral import Referral
 from app.models.wallet import Withdrawal
 from app.schemas.user_schema import (
@@ -18,6 +18,7 @@ from app.schemas.user_schema import (
 from app.schemas.common_schema import PaginatedResponse
 from app.schemas.auth_schema import MessageResponse
 from app.services import wallet_service
+from app.services import verification_service
 
 
 router = APIRouter(prefix="/admin/users", tags=["Admin - Users"])
@@ -29,6 +30,13 @@ def _build_admin_user_response(
     wallet_address: str | None,
     referral_count: int,
     referral_total_deposits,
+    verification_status: str | None = None,
+    verification_submitted_at=None,
+    verification_reviewed_at=None,
+    verification_rejection_reason: str | None = None,
+    verification_id_document_filename: str | None = None,
+    verification_selfie_document_filename: str | None = None,
+    base_url: str | None = None,
 ) -> UserListResponse:
     breakdown = wallet_service.build_user_balance_breakdown(user)
     return UserListResponse(
@@ -50,12 +58,32 @@ def _build_admin_user_response(
         wallet_address=wallet_address,
         referral_count=referral_count,
         referral_total_deposits=referral_total_deposits,
+        verification_status=verification_status or "not_submitted",
+        verification_submitted_at=verification_submitted_at,
+        verification_reviewed_at=verification_reviewed_at,
+        verification_rejection_reason=verification_rejection_reason,
+        verification_id_document_url=verification_service.build_verification_document_url(
+            user.id,
+            verification_id_document_filename,
+            base_url,
+        ),
+        verification_selfie_document_url=verification_service.build_verification_document_url(
+            user.id,
+            verification_selfie_document_filename,
+            base_url,
+        ),
+        verification_address_document_url=verification_service.build_verification_document_url(
+            user.id,
+            verification_selfie_document_filename,
+            base_url,
+        ),
         created_at=user.created_at,
     )
 
 
 @router.get("", response_model=PaginatedResponse[UserListResponse])
 async def list_users(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     role: str = Query(None, pattern="^(user|admin)$"),
@@ -98,9 +126,20 @@ async def list_users(
                 "referral_total_deposits"
             ),
             wallet_agg.c.wallet_address.label("wallet_address"),
+            UserVerification.status.label("verification_status"),
+            UserVerification.submitted_at.label("verification_submitted_at"),
+            UserVerification.reviewed_at.label("verification_reviewed_at"),
+            UserVerification.rejection_reason.label("verification_rejection_reason"),
+            UserVerification.id_document_filename.label(
+                "verification_id_document_filename"
+            ),
+            UserVerification.address_document_filename.label(
+                "verification_selfie_document_filename"
+            ),
         )
         .outerjoin(referral_agg, referral_agg.c.referrer_id == User.id)
         .outerjoin(wallet_agg, wallet_agg.c.wallet_user_id == User.id)
+        .outerjoin(UserVerification, UserVerification.user_id == User.id)
     )
 
     count_query = (
@@ -133,6 +172,7 @@ async def list_users(
     query = query.order_by(User.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     rows = result.all()
+    base_url = str(request.base_url).rstrip("/")
     total_result = await db.execute(count_query)
     total = int(total_result.scalar_one() or 0)
 
@@ -143,6 +183,13 @@ async def list_users(
                 wallet_address=row.wallet_address,
                 referral_count=int(row.referral_count or 0),
                 referral_total_deposits=row.referral_total_deposits,
+                verification_status=row.verification_status,
+                verification_submitted_at=row.verification_submitted_at,
+                verification_reviewed_at=row.verification_reviewed_at,
+                verification_rejection_reason=row.verification_rejection_reason,
+                verification_id_document_filename=row.verification_id_document_filename,
+                verification_selfie_document_filename=row.verification_selfie_document_filename,
+                base_url=base_url,
             )
             for row in rows
         ],
@@ -154,6 +201,7 @@ async def list_users(
 
 @router.get("/{user_id}", response_model=UserListResponse)
 async def get_user(
+    request: Request,
     user_id: Annotated[int, Path(ge=1000000, le=9999999)],
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -182,17 +230,40 @@ async def get_user(
         )
     )
     wallet_address = wallet_result.scalar_one_or_none()
+    verification_result = await db.execute(
+        select(UserVerification).where(UserVerification.user_id == user.id)
+    )
+    verification = verification_result.scalar_one_or_none()
+    base_url = str(request.base_url).rstrip("/")
 
     return _build_admin_user_response(
         user=user,
         wallet_address=wallet_address,
         referral_count=int(referral_count or 0),
         referral_total_deposits=referral_total_deposits,
+        verification_status=(
+            verification_service.get_verification_status_value(verification)
+            if verification
+            else "not_submitted"
+        ),
+        verification_submitted_at=verification.submitted_at if verification else None,
+        verification_reviewed_at=verification.reviewed_at if verification else None,
+        verification_rejection_reason=(
+            verification.rejection_reason if verification else None
+        ),
+        verification_id_document_filename=(
+            verification.id_document_filename if verification else None
+        ),
+        verification_selfie_document_filename=(
+            verification.address_document_filename if verification else None
+        ),
+        base_url=base_url,
     )
 
 
 @router.put("/{user_id}", response_model=UserListResponse)
 async def update_user(
+    request: Request,
     user_id: Annotated[int, Path(ge=1000000, le=9999999)],
     data: AdminUserUpdate,
     admin: User = Depends(get_current_admin),
@@ -247,12 +318,34 @@ async def update_user(
         )
     )
     wallet_address = wallet_result.scalar_one_or_none()
+    verification_result = await db.execute(
+        select(UserVerification).where(UserVerification.user_id == user.id)
+    )
+    verification = verification_result.scalar_one_or_none()
+    base_url = str(request.base_url).rstrip("/")
 
     return _build_admin_user_response(
         user=user,
         wallet_address=wallet_address,
         referral_count=int(referral_count or 0),
         referral_total_deposits=referral_total_deposits,
+        verification_status=(
+            verification_service.get_verification_status_value(verification)
+            if verification
+            else "not_submitted"
+        ),
+        verification_submitted_at=verification.submitted_at if verification else None,
+        verification_reviewed_at=verification.reviewed_at if verification else None,
+        verification_rejection_reason=(
+            verification.rejection_reason if verification else None
+        ),
+        verification_id_document_filename=(
+            verification.id_document_filename if verification else None
+        ),
+        verification_selfie_document_filename=(
+            verification.address_document_filename if verification else None
+        ),
+        base_url=base_url,
     )
 
 

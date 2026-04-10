@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
     UPLOADS_DIR: str = "./uploads"
+    VERIFICATION_MAX_FILE_SIZE_MB: int = 10
 
     # CORS
     CORS_ORIGINS: str = (

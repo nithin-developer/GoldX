@@ -734,6 +734,58 @@ def _ensure_user_balance_breakdown_columns(sync_conn) -> None:
     )
 
 
+def _ensure_user_verification_rows(sync_conn) -> None:
+    """Ensure one verification row exists per user and normalize statuses."""
+    inspector = inspect(sync_conn)
+    table_names = set(inspector.get_table_names())
+
+    if "users" not in table_names or "user_verifications" not in table_names:
+        return
+
+    sync_conn.execute(
+        text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS "
+            "ix_user_verifications_user_id_unique ON user_verifications (user_id)"
+        )
+    )
+    sync_conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS "
+            "ix_user_verifications_status ON user_verifications (status)"
+        )
+    )
+
+    sync_conn.execute(
+        text(
+            "INSERT INTO user_verifications (user_id, status, created_at, updated_at) "
+            "SELECT users.id, 'not_submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP "
+            "FROM users "
+            "LEFT JOIN user_verifications ON user_verifications.user_id = users.id "
+            "WHERE user_verifications.user_id IS NULL"
+        )
+    )
+
+    sync_conn.execute(
+        text(
+            "UPDATE user_verifications "
+            "SET status = CASE "
+            "WHEN status IS NULL OR TRIM(status) = '' THEN 'not_submitted' "
+            "WHEN LOWER(status) IN ('unverified', 'not_verified') THEN 'not_submitted' "
+            "WHEN LOWER(status) NOT IN ('not_submitted', 'pending', 'approved', 'rejected') THEN 'not_submitted' "
+            "ELSE LOWER(status) "
+            "END"
+        )
+    )
+
+    sync_conn.execute(
+        text(
+            "UPDATE user_verifications "
+            "SET created_at = COALESCE(created_at, CURRENT_TIMESTAMP), "
+            "updated_at = COALESCE(updated_at, CURRENT_TIMESTAMP)"
+        )
+    )
+
+
 def _ensure_support_link_and_drop_legacy_support_table(sync_conn) -> None:
     """Add support link column and remove deprecated support chat table."""
     inspector = inspect(sync_conn)
@@ -774,6 +826,7 @@ async def init_db():
         await conn.run_sync(_ensure_signal_public_ids)
         await conn.run_sync(_ensure_wallet_public_ids_and_payment_proofs)
         await conn.run_sync(_ensure_user_balance_breakdown_columns)
+        await conn.run_sync(_ensure_user_verification_rows)
         await conn.run_sync(_ensure_support_link_and_drop_legacy_support_table)
 
 

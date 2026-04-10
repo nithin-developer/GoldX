@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:signalpro/app/pages/app_shell.dart';
 import 'package:signalpro/app/pages/login_page.dart';
 import 'package:signalpro/app/pages/register_page.dart';
+import 'package:signalpro/app/pages/verification_page.dart';
 import 'package:signalpro/app/services/auth_controller.dart';
 import 'package:signalpro/app/services/auth_scope.dart';
 import 'package:signalpro/app/pages/splash_page.dart';
@@ -47,6 +48,17 @@ class _LaunchGateState extends State<LaunchGate> {
     }
 
     if (auth.status == AuthStatus.authenticated) {
+      final verificationStatus =
+          auth.currentUser?.verificationStatus ?? 'not_submitted';
+
+      if (verificationStatus != 'approved') {
+        return VerificationPage(
+          onApproved: () async {
+            await auth.reloadUser();
+          },
+        );
+      }
+
       return AppShell(onLogout: auth.logout);
     }
 

@@ -1,12 +1,12 @@
 from decimal import Decimal
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import aliased
 from app.core.database import get_db
 from app.core.dependencies import get_current_admin
-from app.models.user import User
+from app.models.user import User, UserVerification
 from app.models.wallet import Deposit, Withdrawal
 from app.models.signal import Signal
 from app.models.notification import Notification, Announcement
@@ -27,7 +27,13 @@ from app.schemas.wallet_schema import (
     AdminWithdrawalAction,
 )
 from app.schemas.auth_schema import MessageResponse
+from app.schemas.verification_schema import (
+    AdminVerificationApproveRequest,
+    AdminVerificationListItemResponse,
+    AdminVerificationRejectRequest,
+)
 from app.services import wallet_service
+from app.services import verification_service
 
 
 router = APIRouter(prefix="/admin", tags=["Admin - Reports & Management"])
@@ -68,6 +74,41 @@ def _build_withdrawal_response(withdrawal) -> WithdrawalResponse:
         wallet_address=withdrawal.wallet_address,
         admin_note=withdrawal.admin_note,
         created_at=withdrawal.created_at,
+    )
+
+
+def _build_admin_verification_response(
+    verification: UserVerification,
+    user: User,
+    base_url: str | None = None,
+) -> AdminVerificationListItemResponse:
+    return AdminVerificationListItemResponse(
+        verification_id=verification.id,
+        user_id=user.id,
+        user_email=user.email,
+        user_full_name=user.full_name,
+        status=verification_service.get_verification_status_value(verification),
+        id_document_url=verification_service.build_verification_document_url(
+            user.id,
+            verification.id_document_filename,
+            base_url,
+        ),
+        selfie_document_url=verification_service.build_verification_document_url(
+            user.id,
+            verification.address_document_filename,
+            base_url,
+        ),
+        address_document_url=verification_service.build_verification_document_url(
+            user.id,
+            verification.address_document_filename,
+            base_url,
+        ),
+        submitted_at=verification.submitted_at,
+        reviewed_at=verification.reviewed_at,
+        reviewed_by_admin_id=verification.reviewed_by_admin_id,
+        rejection_reason=verification.rejection_reason,
+        created_at=verification.created_at,
+        updated_at=verification.updated_at,
     )
 
 
@@ -258,6 +299,113 @@ async def reject_withdrawal(
         withdrawal_id, data.admin_note, db
     )
     return _build_withdrawal_response(withdrawal)
+
+
+# --- Verification Management ---
+@router.get(
+    "/verifications",
+    response_model=PaginatedResponse[AdminVerificationListItemResponse],
+)
+async def list_verifications(
+    request: Request,
+    status: str = Query(
+        "pending",
+        pattern="^(pending|approved|rejected|not_submitted|all)$",
+    ),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    verification_query = select(UserVerification, User).join(
+        User,
+        User.id == UserVerification.user_id,
+    )
+    count_query = select(func.count(UserVerification.id))
+
+    if status != "all":
+        verification_query = verification_query.where(UserVerification.status == status)
+        count_query = count_query.where(UserVerification.status == status)
+
+    total_result = await db.execute(count_query)
+    total = int(total_result.scalar_one() or 0)
+
+    verification_query = verification_query.order_by(
+        UserVerification.created_at.desc()
+    ).offset(skip).limit(limit)
+    rows = (await db.execute(verification_query)).all()
+    base_url = str(request.base_url).rstrip("/")
+
+    return PaginatedResponse[AdminVerificationListItemResponse](
+        items=[
+            _build_admin_verification_response(
+                verification=row[0],
+                user=row[1],
+                base_url=base_url,
+            )
+            for row in rows
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
+
+
+@router.put(
+    "/verifications/{user_id}/approve",
+    response_model=AdminVerificationListItemResponse,
+)
+async def approve_verification(
+    request: Request,
+    user_id: int = Path(..., ge=1000000, le=9999999),
+    data: AdminVerificationApproveRequest | None = None,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    del data
+
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if user is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="User not found")
+
+    verification = await verification_service.approve_user_verification(
+        user_id=user_id,
+        admin=admin,
+        db=db,
+    )
+    base_url = str(request.base_url).rstrip("/")
+    return _build_admin_verification_response(verification, user, base_url)
+
+
+@router.put(
+    "/verifications/{user_id}/reject",
+    response_model=AdminVerificationListItemResponse,
+)
+async def reject_verification(
+    request: Request,
+    payload: AdminVerificationRejectRequest,
+    user_id: int = Path(..., ge=1000000, le=9999999),
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if user is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="User not found")
+
+    verification = await verification_service.reject_user_verification(
+        user_id=user_id,
+        admin=admin,
+        rejection_reason=payload.rejection_reason,
+        db=db,
+    )
+    base_url = str(request.base_url).rstrip("/")
+    return _build_admin_verification_response(verification, user, base_url)
 
 
 # --- Notifications ---

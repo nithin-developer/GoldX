@@ -81,6 +81,26 @@ class AppLocalizations {
     'I agree to the Terms of Service and Privacy Policy.':
         'أوافق على شروط الخدمة وسياسة الخصوصية.',
     'Already have an account? Login': 'لديك حساب بالفعل؟ سجّل الدخول',
+    'Account Verification': 'التحقق من الحساب',
+    'Upload your documents to activate dashboard access.':
+        'ارفع مستنداتك لتفعيل الوصول إلى لوحة التحكم.',
+    'Status: {status}': 'الحالة: {status}',
+    'Submitted for review': 'تم الإرسال للمراجعة',
+    'ID DOCUMENT (PASSPORT / LICENSE)': 'مستند الهوية (جواز السفر / الرخصة)',
+    'Upload clear front-side document image':
+        'ارفع صورة واضحة للواجهة الأمامية للمستند',
+    'SELFIE / USER PICTURE': 'صورة سيلفي / صورة المستخدم',
+    'Upload a clear selfie or live face picture':
+        'ارفع صورة سيلفي واضحة أو صورة مباشرة للوجه',
+    'Submit Verification Documents': 'إرسال مستندات التحقق',
+    'Refresh Status': 'تحديث الحالة',
+    'Please upload both required documents.':
+        'يرجى رفع كلا المستندين المطلوبين.',
+    'Documents submitted successfully. Await admin review.':
+        'تم إرسال المستندات بنجاح. بانتظار مراجعة الإدارة.',
+    'Your verification request is under review.':
+        'طلب التحقق الخاص بك قيد المراجعة.',
+    'Rejection reason: {reason}': 'سبب الرفض: {reason}',
     'Please complete all required fields.': 'يرجى إكمال جميع الحقول المطلوبة.',
     'Name must be at least 2 characters.': 'يجب أن يكون الاسم حرفين على الأقل.',
     'Unable to connect to server. Please try again.':

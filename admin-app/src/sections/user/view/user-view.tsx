@@ -71,6 +71,32 @@ function getAvatarInitial(user: UserData) {
   return source.charAt(0).toUpperCase();
 }
 
+const verificationChipColorMap: Record<
+  string,
+  'default' | 'success' | 'error' | 'warning'
+> = {
+  not_submitted: 'default',
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'error',
+};
+
+function normalizeVerificationStatus(value?: string | null) {
+  const normalized = (value ?? 'not_submitted').trim().toLowerCase();
+  return normalized || 'not_submitted';
+}
+
+function formatVerificationStatus(value?: string | null) {
+  return normalizeVerificationStatus(value)
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function isPdfUrl(url: string) {
+  return url.toLowerCase().includes('.pdf');
+}
+
 const DEFAULT_RESET_PASSWORD = 'GoldX@1234';
 
 type PasswordResetAction = {
@@ -329,6 +355,20 @@ export function UserView() {
                         }
                       />
                       <DetailRow
+                        label="Verification"
+                        value={
+                          <Chip
+                            size="small"
+                            label={formatVerificationStatus(selectedUser.verification_status)}
+                            color={
+                              verificationChipColorMap[
+                                normalizeVerificationStatus(selectedUser.verification_status)
+                              ] ?? 'default'
+                            }
+                          />
+                        }
+                      />
+                      <DetailRow
                         label="Joined At"
                         value={formatDateTime(selectedUser.created_at)}
                       />
@@ -440,6 +480,80 @@ export function UserView() {
                     >
                       Reset Withdraw Password
                     </Button>
+                  </Stack>
+                </Box>
+
+                <Box
+                  sx={(theme) => ({
+                    p: 2,
+                    borderRadius: 2,
+                    border: `1px solid ${theme.palette.divider}`,
+                  })}
+                >
+                  <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                    Verification Documents
+                  </Typography>
+                  <Divider sx={{ my: 1.25 }} />
+
+                  <Stack spacing={1.5}>
+                    <DetailRow
+                      label="Submitted At"
+                      value={formatDateTime(selectedUser.verification_submitted_at ?? undefined)}
+                    />
+                    <DetailRow
+                      label="Reviewed At"
+                      value={formatDateTime(selectedUser.verification_reviewed_at ?? undefined)}
+                    />
+                    <DetailRow
+                      label="Rejection Reason"
+                      value={selectedUser.verification_rejection_reason?.trim() || '--'}
+                    />
+
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                      {selectedUser.verification_id_document_url ? (
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          href={selectedUser.verification_id_document_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {isPdfUrl(selectedUser.verification_id_document_url)
+                            ? 'Open ID PDF'
+                            : 'Open ID Document'}
+                        </Button>
+                      ) : (
+                        <Button fullWidth variant="outlined" disabled>
+                          ID Document Not Uploaded
+                        </Button>
+                      )}
+
+                      {(selectedUser.verification_selfie_document_url ||
+                        selectedUser.verification_address_document_url) ? (
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          href={(
+                            selectedUser.verification_selfie_document_url ||
+                            selectedUser.verification_address_document_url
+                          )!}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {isPdfUrl(
+                            selectedUser.verification_selfie_document_url ||
+                              selectedUser.verification_address_document_url ||
+                              ''
+                          )
+                            ? 'Open Selfie PDF'
+                            : 'Open Selfie Document'}
+                        </Button>
+                      ) : (
+                        <Button fullWidth variant="outlined" disabled>
+                          Selfie Document Not Uploaded
+                        </Button>
+                      )}
+                    </Stack>
                   </Stack>
                 </Box>
               </Stack>

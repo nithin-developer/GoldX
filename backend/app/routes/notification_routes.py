@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_verified_user
 from app.models.user import User
 from app.models.notification import Notification
 from app.schemas.notification_schema import (
@@ -20,7 +20,7 @@ async def get_notifications(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     unread_only: bool = Query(False),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get notifications for the current user."""
@@ -39,7 +39,7 @@ async def get_notifications(
 @router.put("/read", response_model=MessageResponse)
 async def mark_notifications_read(
     data: MarkNotificationsReadRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ):
     """

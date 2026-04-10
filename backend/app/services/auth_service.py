@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from fastapi import HTTPException, status
-from app.models.user import User
+from app.models.user import User, UserVerification
 from app.models.referral import Referral
 from app.core.security import (
     hash_password,
@@ -94,6 +94,12 @@ async def register_user(data: RegisterRequest, db: AsyncSession) -> User:
         status="pending",
     )
     db.add(referral)
+
+    verification = UserVerification(
+        user_id=user.id,
+        status="not_submitted",
+    )
+    db.add(verification)
 
     await db.flush()
     return user
