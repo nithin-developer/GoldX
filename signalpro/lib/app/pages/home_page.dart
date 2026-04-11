@@ -61,6 +61,7 @@ class _HomePageState extends State<HomePage> {
 
   AppDataApi? _api;
   Future<HomeDashboardData>? _future;
+  int? _sessionRevision;
 
   WebSocketChannel? _tickerChannel;
   StreamSubscription<dynamic>? _tickerSubscription;
@@ -85,7 +86,17 @@ class _HomePageState extends State<HomePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _api ??= AppDataApi(dio: AuthScope.of(context).apiClient.dio);
+    final auth = AuthScope.of(context);
+    final revision = auth.sessionRevision;
+
+    if (_sessionRevision != revision) {
+      _sessionRevision = revision;
+      _api = AppDataApi(dio: auth.apiClient.dio);
+      _future = _api!.getHomeDashboard(forceRefresh: true, activityLimit: 5);
+      return;
+    }
+
+    _api ??= AppDataApi(dio: auth.apiClient.dio);
     _future ??= _api!.getHomeDashboard(activityLimit: 5);
   }
 

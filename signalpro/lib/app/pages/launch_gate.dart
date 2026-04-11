@@ -59,7 +59,10 @@ class _LaunchGateState extends State<LaunchGate> {
         );
       }
 
-      return AppShell(onLogout: auth.logout);
+      return AppShell(
+        key: ValueKey<int>(auth.sessionRevision),
+        onLogout: auth.logout,
+      );
     }
 
     switch (_unauthView) {

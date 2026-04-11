@@ -37,11 +37,22 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   AppDataApi? _api;
   Future<UserProfile>? _future;
+  int? _sessionRevision;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _api ??= AppDataApi(dio: AuthScope.of(context).apiClient.dio);
+    final auth = AuthScope.of(context);
+    final revision = auth.sessionRevision;
+
+    if (_sessionRevision != revision) {
+      _sessionRevision = revision;
+      _api = AppDataApi(dio: auth.apiClient.dio);
+      _future = _api!.getProfile(forceRefresh: true);
+      return;
+    }
+
+    _api ??= AppDataApi(dio: auth.apiClient.dio);
     _future ??= _api!.getProfile();
   }
 

@@ -15,6 +15,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     : _authApi = authApi ?? AuthApi(),
       _tokenStorage = tokenStorage ?? TokenStorage() {
     apiClient = ApiClient(authSessionDelegate: this);
+    _beginFreshSessionCache();
   }
 
   final AuthApi _authApi;
@@ -22,6 +23,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
 
   AuthStatus _status = AuthStatus.checking;
   AuthStatus get status => _status;
+  int get sessionRevision => AppDataApi.sessionRevision;
 
   AuthTokens? _tokens;
   UserProfile? _currentUser;
@@ -36,7 +38,13 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
   @override
   String? get accessToken => _tokens?.accessToken;
 
+  void _beginFreshSessionCache() {
+    AppDataApi.startNewSessionCache();
+    AppDataApi.clearAllCaches();
+  }
+
   Future<void> initialize() async {
+    _beginFreshSessionCache();
     _status = AuthStatus.checking;
     notifyListeners();
 
@@ -45,7 +53,6 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     if (storedTokens == null) {
       _tokens = null;
       _currentUser = null;
-      AppDataApi.clearAllCaches();
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return;
@@ -57,7 +64,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     if (!restored) {
       _tokens = null;
       _currentUser = null;
-      AppDataApi.clearAllCaches();
+      _beginFreshSessionCache();
       await _tokenStorage.clear();
     }
 
@@ -74,9 +81,9 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
 
     try {
       final tokens = await _authApi.login(email: email, password: password);
+      _beginFreshSessionCache();
       _tokens = tokens;
       await _tokenStorage.saveTokens(tokens);
-      AppDataApi.clearAllCaches();
       _currentUser = await _fetchMeWithClient();
       _status = AuthStatus.authenticated;
       return null;
@@ -106,9 +113,9 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
         password: password,
         inviteCode: inviteCode,
       );
+      _beginFreshSessionCache();
       _tokens = tokens;
       await _tokenStorage.saveTokens(tokens);
-      AppDataApi.clearAllCaches();
       _currentUser = await _fetchMeWithClient();
       _status = AuthStatus.authenticated;
       return null;
@@ -124,7 +131,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     _tokens = null;
     _currentUser = null;
     _status = AuthStatus.unauthenticated;
-    AppDataApi.clearAllCaches();
+    _beginFreshSessionCache();
     await _tokenStorage.clear();
     notifyListeners();
   }
@@ -199,7 +206,7 @@ class AuthController extends ChangeNotifier implements AuthSessionDelegate {
     } on ApiException {
       _tokens = null;
       _currentUser = null;
-      AppDataApi.clearAllCaches();
+      _beginFreshSessionCache();
       await _tokenStorage.clear();
       return false;
     }

@@ -79,7 +79,9 @@ class _VerificationPageState extends State<VerificationPage> {
     try {
       final selected = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 95,
+        imageQuality: 60,
+        maxWidth: 1080,
+        maxHeight: 1080,
       );
 
       if (!mounted) {
@@ -116,7 +118,9 @@ class _VerificationPageState extends State<VerificationPage> {
     try {
       final selected = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 95,
+        imageQuality: 60,
+        maxWidth: 1080,
+        maxHeight: 1080,
       );
 
       if (!mounted) {
@@ -330,6 +334,60 @@ class _VerificationPageState extends State<VerificationPage> {
                                             style: const TextStyle(
                                               color: AppColors.textSecondary,
                                             ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceSoft
+                                                .withValues(alpha: 0.65),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.border
+                                                  .withValues(alpha: 0.60),
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                l10n.tr('Upload instructions'),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                l10n.tr(
+                                                  'Allowed formats: JPG, JPEG, PNG, WEBP.',
+                                                ),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                l10n.tr(
+                                                  'Use images less than 2MB for best results (maximum 4MB per file).',
+                                                ),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                         const SizedBox(height: 16),

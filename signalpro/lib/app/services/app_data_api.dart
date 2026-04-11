@@ -8,27 +8,59 @@ import 'package:signalpro/app/models/user_profile.dart';
 import 'package:signalpro/app/services/api_exception.dart';
 
 class AppDataApi {
-  const AppDataApi({required Dio dio}) : _dio = dio;
+  AppDataApi({required Dio dio})
+    : _dio = dio,
+      _cacheNamespace = _activeCacheNamespace;
 
   final Dio _dio;
-  static final Map<String, List<SignalFeedItem>> _signalCache = {};
-  static List<SignalHistoryItem>? _signalHistoryCache;
-  static ReferralStats? _referralStatsCache;
-  static final Map<String, List<ReferralItem>> _referralsCache = {};
-  static List<AppNotification>? _notificationsCache;
-  static UserProfile? _profileCache;
-  static int? _unreadNotificationsCache;
-  static HomeDashboardData? _homeDashboardCache;
+  final String _cacheNamespace;
 
-  static void clearAllCaches() {
-    _signalCache.clear();
-    _signalHistoryCache = null;
-    _referralStatsCache = null;
-    _referralsCache.clear();
-    _notificationsCache = null;
-    _profileCache = null;
-    _unreadNotificationsCache = null;
-    _homeDashboardCache = null;
+  static int _sessionRevision = 0;
+  static String _activeCacheNamespace = 'session:0';
+  static final Set<String> _retiredCacheNamespaces = <String>{};
+  static final Map<String, _SessionCacheBucket> _cacheBucketsByNamespace = {
+    _activeCacheNamespace: _SessionCacheBucket(),
+  };
+  static final _SessionCacheBucket _discardedCacheBucket =
+      _SessionCacheBucket();
+
+  static int get sessionRevision => _sessionRevision;
+
+  static int startNewSessionCache() {
+    final previousNamespace = _activeCacheNamespace;
+    _retiredCacheNamespaces.add(previousNamespace);
+    _cacheBucketsByNamespace.remove(previousNamespace);
+
+    _sessionRevision += 1;
+    _activeCacheNamespace = 'session:$_sessionRevision';
+    _cacheBucketsByNamespace[_activeCacheNamespace] = _SessionCacheBucket();
+    _discardedCacheBucket.clear();
+    return _sessionRevision;
+  }
+
+  static void clearAllCaches({bool includeRetiredNamespaces = false}) {
+    if (includeRetiredNamespaces) {
+      _cacheBucketsByNamespace.clear();
+      _retiredCacheNamespaces.clear();
+      _discardedCacheBucket.clear();
+      _cacheBucketsByNamespace[_activeCacheNamespace] = _SessionCacheBucket();
+      return;
+    }
+
+    _cacheBucketsByNamespace[_activeCacheNamespace]?.clear();
+  }
+
+  _SessionCacheBucket get _cache {
+    final namespace = _cacheNamespace;
+    if (namespace != _activeCacheNamespace &&
+        _retiredCacheNamespaces.contains(namespace)) {
+      return _discardedCacheBucket;
+    }
+
+    return _cacheBucketsByNamespace.putIfAbsent(
+      namespace,
+      _SessionCacheBucket.new,
+    );
   }
 
   String _signalsCacheKey(String? status) {
@@ -41,7 +73,7 @@ class AppDataApi {
 
   List<SignalFeedItem>? getCachedSignals({String? status}) {
     final key = _signalsCacheKey(status);
-    final cached = _signalCache[key];
+    final cached = _cache.signalCache[key];
     if (cached == null) {
       return null;
     }
@@ -49,7 +81,7 @@ class AppDataApi {
   }
 
   List<SignalHistoryItem>? getCachedSignalHistory() {
-    final cached = _signalHistoryCache;
+    final cached = _cache.signalHistoryCache;
     if (cached == null) {
       return null;
     }
@@ -62,12 +94,12 @@ class AppDataApi {
   }
 
   ReferralStats? getCachedReferralStats() {
-    return _referralStatsCache;
+    return _cache.referralStatsCache;
   }
 
   List<ReferralItem>? getCachedReferrals({int skip = 0, int limit = 20}) {
     final key = _referralsCacheKey(skip: skip, limit: limit);
-    final cached = _referralsCache[key];
+    final cached = _cache.referralsCache[key];
     if (cached == null) {
       return null;
     }
@@ -75,11 +107,11 @@ class AppDataApi {
   }
 
   UserProfile? getCachedProfile() {
-    return _profileCache;
+    return _cache.profileCache;
   }
 
   List<AppNotification>? getCachedNotifications() {
-    final cached = _notificationsCache;
+    final cached = _cache.notificationsCache;
     if (cached == null) {
       return null;
     }
@@ -88,11 +120,11 @@ class AppDataApi {
   }
 
   int? getCachedUnreadNotificationsCount() {
-    return _unreadNotificationsCache;
+    return _cache.unreadNotificationsCache;
   }
 
   HomeDashboardData? getCachedHomeDashboard() {
-    return _homeDashboardCache;
+    return _cache.homeDashboardCache;
   }
 
   Future<List<AppNotification>> getNotifications({
@@ -100,8 +132,9 @@ class AppDataApi {
     int pageSize = 100,
     int maxItems = 1000,
   }) async {
-    if (!forceRefresh && _notificationsCache != null) {
-      return List<AppNotification>.from(_notificationsCache!);
+    final cache = _cache;
+    if (!forceRefresh && cache.notificationsCache != null) {
+      return List<AppNotification>.from(cache.notificationsCache!);
     }
 
     try {
@@ -132,8 +165,10 @@ class AppDataApi {
         skip += pageSize;
       }
 
-      _notificationsCache = mapped;
-      _unreadNotificationsCache = mapped.where((item) => item.isUnread).length;
+      cache.notificationsCache = mapped;
+      cache.unreadNotificationsCache = mapped
+          .where((item) => item.isUnread)
+          .length;
       return List<AppNotification>.from(mapped);
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -156,14 +191,15 @@ class AppDataApi {
     try {
       await _dio.put<void>('/notifications/read', data: payload);
 
-      if (_notificationsCache != null) {
+      final cache = _cache;
+      if (cache.notificationsCache != null) {
         if (markAll) {
-          _notificationsCache = _notificationsCache!
+          cache.notificationsCache = cache.notificationsCache!
               .map((item) => item.copyWith(isRead: true))
               .toList();
         } else {
           final ids = notificationIds.toSet();
-          _notificationsCache = _notificationsCache!
+          cache.notificationsCache = cache.notificationsCache!
               .map(
                 (item) =>
                     ids.contains(item.id) ? item.copyWith(isRead: true) : item,
@@ -171,14 +207,15 @@ class AppDataApi {
               .toList();
         }
 
-        _unreadNotificationsCache = _notificationsCache!
+        cache.unreadNotificationsCache = cache.notificationsCache!
             .where((item) => item.isUnread)
             .length;
       } else if (markAll) {
-        _unreadNotificationsCache = 0;
-      } else if (_unreadNotificationsCache != null) {
-        final remaining = _unreadNotificationsCache! - notificationIds.length;
-        _unreadNotificationsCache = remaining < 0 ? 0 : remaining;
+        cache.unreadNotificationsCache = 0;
+      } else if (cache.unreadNotificationsCache != null) {
+        final remaining =
+            cache.unreadNotificationsCache! - notificationIds.length;
+        cache.unreadNotificationsCache = remaining < 0 ? 0 : remaining;
       }
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -194,8 +231,9 @@ class AppDataApi {
   }) async {
     final key = _signalsCacheKey(status);
     final canUseCache = !includeAllStatuses && skip == 0 && limit == 100;
+    final cache = _cache;
     if (!forceRefresh && canUseCache) {
-      final cached = _signalCache[key];
+      final cached = cache.signalCache[key];
       if (cached != null) {
         return List<SignalFeedItem>.from(cached);
       }
@@ -224,7 +262,7 @@ class AppDataApi {
           .toList();
 
       if (canUseCache) {
-        _signalCache[key] = mapped;
+        cache.signalCache[key] = mapped;
       }
 
       return List<SignalFeedItem>.from(mapped);
@@ -239,8 +277,9 @@ class AppDataApi {
     int limit = 100,
   }) async {
     final canUseCache = skip == 0 && limit == 100;
-    if (!forceRefresh && canUseCache && _signalHistoryCache != null) {
-      return List<SignalHistoryItem>.from(_signalHistoryCache!);
+    final cache = _cache;
+    if (!forceRefresh && canUseCache && cache.signalHistoryCache != null) {
+      return List<SignalHistoryItem>.from(cache.signalHistoryCache!);
     }
 
     try {
@@ -260,7 +299,7 @@ class AppDataApi {
           .toList();
 
       if (canUseCache) {
-        _signalHistoryCache = mapped;
+        cache.signalHistoryCache = mapped;
       }
 
       return List<SignalHistoryItem>.from(mapped);
@@ -281,16 +320,18 @@ class AppDataApi {
         data: {'signal_code': normalizedCode},
       );
 
-      _signalCache.clear();
-      _signalHistoryCache = null;
+      final cache = _cache;
+      cache.signalCache.clear();
+      cache.signalHistoryCache = null;
     } on DioException catch (error) {
       throw mapDioError(error);
     }
   }
 
   Future<ReferralStats> getReferralStats({bool forceRefresh = false}) async {
-    if (!forceRefresh && _referralStatsCache != null) {
-      return _referralStatsCache!;
+    final cache = _cache;
+    if (!forceRefresh && cache.referralStatsCache != null) {
+      return cache.referralStatsCache!;
     }
 
     try {
@@ -301,7 +342,7 @@ class AppDataApi {
         },
       );
       final stats = ReferralStats.fromJson(response.data ?? const {});
-      _referralStatsCache = stats;
+      cache.referralStatsCache = stats;
       return stats;
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -314,8 +355,9 @@ class AppDataApi {
     bool forceRefresh = false,
   }) async {
     final key = _referralsCacheKey(skip: skip, limit: limit);
+    final cache = _cache;
     if (!forceRefresh) {
-      final cached = _referralsCache[key];
+      final cached = cache.referralsCache[key];
       if (cached != null) {
         return List<ReferralItem>.from(cached);
       }
@@ -337,7 +379,7 @@ class AppDataApi {
           .map(ReferralItem.fromJson)
           .toList();
 
-      _referralsCache[key] = referrals;
+      cache.referralsCache[key] = referrals;
       return List<ReferralItem>.from(referrals);
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -345,8 +387,9 @@ class AppDataApi {
   }
 
   Future<UserProfile> getProfile({bool forceRefresh = false}) async {
-    if (!forceRefresh && _profileCache != null) {
-      return _profileCache!;
+    final cache = _cache;
+    if (!forceRefresh && cache.profileCache != null) {
+      return cache.profileCache!;
     }
 
     try {
@@ -357,7 +400,7 @@ class AppDataApi {
         },
       );
       final profile = UserProfile.fromJson(response.data ?? const {});
-      _profileCache = profile;
+      cache.profileCache = profile;
       return profile;
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -365,16 +408,17 @@ class AppDataApi {
   }
 
   Future<int> getUnreadNotificationsCount({bool forceRefresh = false}) async {
+    final cache = _cache;
     if (!forceRefresh) {
-      if (_unreadNotificationsCache != null) {
-        return _unreadNotificationsCache!;
+      if (cache.unreadNotificationsCache != null) {
+        return cache.unreadNotificationsCache!;
       }
 
-      if (_notificationsCache != null) {
-        _unreadNotificationsCache = _notificationsCache!
+      if (cache.notificationsCache != null) {
+        cache.unreadNotificationsCache = cache.notificationsCache!
             .where((item) => item.isUnread)
             .length;
-        return _unreadNotificationsCache!;
+        return cache.unreadNotificationsCache!;
       }
     }
 
@@ -388,7 +432,7 @@ class AppDataApi {
         },
       );
       final count = (response.data ?? const []).length;
-      _unreadNotificationsCache = count;
+      cache.unreadNotificationsCache = count;
       return count;
     } on DioException catch (error) {
       throw mapDioError(error);
@@ -399,8 +443,9 @@ class AppDataApi {
     bool forceRefresh = false,
     int activityLimit = 5,
   }) async {
-    if (!forceRefresh && _homeDashboardCache != null) {
-      return _homeDashboardCache!;
+    final cache = _cache;
+    if (!forceRefresh && cache.homeDashboardCache != null) {
+      return cache.homeDashboardCache!;
     }
 
     try {
@@ -413,10 +458,34 @@ class AppDataApi {
       );
 
       final data = HomeDashboardData.fromJson(response.data ?? const {});
-      _homeDashboardCache = data;
+      cache.homeDashboardCache = data;
       return data;
     } on DioException catch (error) {
       throw mapDioError(error);
     }
+  }
+}
+
+class _SessionCacheBucket {
+  final Map<String, List<SignalFeedItem>> signalCache =
+      <String, List<SignalFeedItem>>{};
+  List<SignalHistoryItem>? signalHistoryCache;
+  ReferralStats? referralStatsCache;
+  final Map<String, List<ReferralItem>> referralsCache =
+      <String, List<ReferralItem>>{};
+  List<AppNotification>? notificationsCache;
+  UserProfile? profileCache;
+  int? unreadNotificationsCache;
+  HomeDashboardData? homeDashboardCache;
+
+  void clear() {
+    signalCache.clear();
+    signalHistoryCache = null;
+    referralStatsCache = null;
+    referralsCache.clear();
+    notificationsCache = null;
+    profileCache = null;
+    unreadNotificationsCache = null;
+    homeDashboardCache = null;
   }
 }

@@ -10,7 +10,14 @@ class ApiException implements Exception {
 }
 
 ApiException mapDioError(DioException error) {
+  final statusCode = error.response?.statusCode;
   final data = error.response?.data;
+
+  if (statusCode == 413) {
+    return ApiException(
+      'Upload is too large. Please use smaller images (recommended below 2MB each).',
+    );
+  }
 
   if (data is Map<String, dynamic>) {
     final detail = data['detail'];

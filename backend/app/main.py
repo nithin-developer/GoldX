@@ -152,6 +152,21 @@ uploads_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 
 
+@app.middleware("http")
+async def disable_cache_for_authenticated_api(request: Request, call_next):
+    """Avoid cross-account stale reads by disabling caches for authenticated API responses."""
+    response = await call_next(request)
+
+    is_api_request = request.url.path.startswith(settings.API_V1_PREFIX)
+    has_auth_header = bool(request.headers.get("authorization"))
+    if is_api_request and has_auth_header:
+        response.headers["Cache-Control"] = "no-store, private"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Vary"] = "Authorization"
+
+    return response
+
+
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

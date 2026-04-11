@@ -84,6 +84,11 @@ class AppLocalizations {
     'Account Verification': 'التحقق من الحساب',
     'Upload your documents to activate dashboard access.':
         'ارفع مستنداتك لتفعيل الوصول إلى لوحة التحكم.',
+    'Upload instructions': 'تعليمات الرفع',
+    'Allowed formats: JPG, JPEG, PNG, WEBP.':
+        'الصيغ المسموحة: JPG و JPEG و PNG و WEBP.',
+    'Use images less than 2MB for best results (maximum 4MB per file).':
+        'استخدم صورًا أقل من 2MB للحصول على أفضل نتيجة (الحد الأقصى 4MB لكل ملف).',
     'Status: {status}': 'الحالة: {status}',
     'Submitted for review': 'تم الإرسال للمراجعة',
     'ID DOCUMENT (PASSPORT / LICENSE)': 'مستند الهوية (جواز السفر / الرخصة)',

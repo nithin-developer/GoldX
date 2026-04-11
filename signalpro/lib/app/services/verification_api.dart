@@ -73,9 +73,11 @@ class VerificationStatusData {
 class VerificationApi {
   const VerificationApi({required Dio dio}) : _dio = dio;
 
+  static const int _maxUploadBytes = 4 * 1024 * 1024;
+
   final Dio _dio;
 
-  Future<MultipartFile> _toMultipartFile(XFile file) async {
+  Future<List<int>> _readValidatedBytes(XFile file) async {
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) {
       throw ApiException(
@@ -83,7 +85,13 @@ class VerificationApi {
       );
     }
 
-    return MultipartFile.fromBytes(bytes, filename: file.name);
+    if (bytes.length > _maxUploadBytes) {
+      throw ApiException(
+        'Selected document is too large. Please use an image below 4MB.',
+      );
+    }
+
+    return bytes;
   }
 
   Future<VerificationStatusData> getStatus() async {
@@ -101,9 +109,23 @@ class VerificationApi {
     required XFile idDocument,
     required XFile selfieDocument,
   }) async {
+    final idBytes = await _readValidatedBytes(idDocument);
+    final selfieBytes = await _readValidatedBytes(selfieDocument);
+
     final formData = FormData.fromMap({
-      'id_document': await _toMultipartFile(idDocument),
-      'selfie_document': await _toMultipartFile(selfieDocument),
+      'id_document': MultipartFile.fromBytes(
+        idBytes,
+        filename: idDocument.name,
+      ),
+      'selfie_document': MultipartFile.fromBytes(
+        selfieBytes,
+        filename: selfieDocument.name,
+      ),
+      // Keep legacy field for compatibility with previously deployed backend.
+      'address_document': MultipartFile.fromBytes(
+        selfieBytes,
+        filename: selfieDocument.name,
+      ),
     });
 
     try {
