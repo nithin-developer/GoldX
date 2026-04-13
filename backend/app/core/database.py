@@ -359,7 +359,7 @@ def _ensure_user_ids_and_invite_codes(sync_conn) -> None:
 
         for fk in fk_references:
             for column_name in fk.get("user_id_columns", []):
-                _apply_int_mapping(
+                _apply_int_mapping_with_temporary_values(
                     sync_conn,
                     str(fk["table_name"]),
                     str(column_name),
@@ -368,7 +368,12 @@ def _ensure_user_ids_and_invite_codes(sync_conn) -> None:
 
         user_column_names = {col["name"] for col in inspector.get_columns("users")}
         if "referred_by" in user_column_names:
-            _apply_int_mapping(sync_conn, "users", "referred_by", id_mapping)
+            _apply_int_mapping_with_temporary_values(
+                sync_conn,
+                "users",
+                "referred_by",
+                id_mapping,
+            )
 
         _apply_int_mapping_with_temporary_values(sync_conn, "users", "id", id_mapping)
 
