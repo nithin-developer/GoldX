@@ -389,13 +389,12 @@ class WalletApi {
   Future<DepositRequestResult> createDeposit({
     required double amount,
     required XFile paymentProof,
-    String? transactionRef,
+    required String transactionRef,
   }) async {
     final proofBytes = await paymentProof.readAsBytes();
     final payload = FormData.fromMap({
       'amount': amount,
-      if (transactionRef != null && transactionRef.trim().isNotEmpty)
-        'transaction_ref': transactionRef.trim(),
+      'transaction_ref': transactionRef.trim(),
       'payment_proof': MultipartFile.fromBytes(
         proofBytes,
         filename: paymentProof.name,

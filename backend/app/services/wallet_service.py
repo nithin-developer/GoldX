@@ -415,6 +415,52 @@ async def get_transactions(
     return result.scalars().all()
 
 
+async def _has_pending_deposit_request(user: User, db: AsyncSession) -> bool:
+    result = await db.execute(
+        select(Deposit.id)
+        .where(
+            Deposit.user_id == user.id,
+            Deposit.status == "pending",
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _has_pending_withdrawal_request(user: User, db: AsyncSession) -> bool:
+    result = await db.execute(
+        select(Withdrawal.id)
+        .where(
+            Withdrawal.user_id == user.id,
+            Withdrawal.status == "pending",
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def ensure_no_pending_deposit_request(user: User, db: AsyncSession) -> None:
+    if await _has_pending_deposit_request(user, db):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "You already have a pending deposit request. "
+                "Please wait until it is approved or rejected before submitting a new one."
+            ),
+        )
+
+
+async def ensure_no_pending_withdrawal_request(user: User, db: AsyncSession) -> None:
+    if await _has_pending_withdrawal_request(user, db):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "You already have a pending withdrawal request. "
+                "Please wait until it is approved or rejected before submitting a new one."
+            ),
+        )
+
+
 async def create_deposit(
     user: User,
     amount: Decimal,
@@ -423,11 +469,20 @@ async def create_deposit(
     db: AsyncSession,
 ) -> Deposit:
     """Create a new deposit request (pending admin approval)."""
+    normalized_transaction_ref = (transaction_ref or "").strip()
+    if not normalized_transaction_ref:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Transaction ID is required",
+        )
+
+    await ensure_no_pending_deposit_request(user, db)
+
     deposit = Deposit(
         user_id=user.id,
         amount=amount,
         status="pending",
-        transaction_ref=transaction_ref,
+        transaction_ref=normalized_transaction_ref,
         payment_proof_filename=payment_proof_filename,
     )
     db.add(deposit)
@@ -513,6 +568,8 @@ async def create_withdrawal(
     db: AsyncSession,
 ) -> Withdrawal:
     """Create a withdrawal request after verifying password and source availability."""
+    await ensure_no_pending_withdrawal_request(user, db)
+
     # Check withdrawal password is set
     if not user.withdrawal_password_hash:
         raise HTTPException(

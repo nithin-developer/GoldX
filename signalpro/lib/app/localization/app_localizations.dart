@@ -296,6 +296,8 @@ class AppLocalizations {
     'Quick Amounts': 'مبالغ سريعة',
     'Transaction Reference (Optional)': 'مرجع المعاملة (اختياري)',
     'Enter transaction ID if available': 'أدخل رقم المعاملة إذا كان متاحًا',
+    'Enter transaction ID': 'أدخل رقم المعاملة',
+    'Transaction ID is required.': 'رقم المعاملة مطلوب.',
     'PAYMENT PROOF': 'إثبات الدفع',
     'Upload a screenshot of your payment transaction.':
         'ارفع لقطة شاشة لعملية الدفع الخاصة بك.',
@@ -308,8 +310,14 @@ class AppLocalizations {
     'Wallet address not configured yet.': 'عنوان المحفظة غير مُعَد بعد.',
     'Wallet address is not configured yet.': 'عنوان المحفظة غير مُعَد بعد.',
     'Wallet address copied to clipboard': 'تم نسخ عنوان المحفظة إلى الحافظة',
+    'Pending deposit request detected. New deposit requests are disabled until the current one is reviewed.':
+        'تم اكتشاف طلب إيداع قيد الانتظار. تم تعطيل طلبات الإيداع الجديدة حتى تتم مراجعة الطلب الحالي.',
+    'You already have a pending deposit request. Please wait for admin approval or rejection before submitting a new one.':
+        'لديك بالفعل طلب إيداع قيد الانتظار. يرجى الانتظار حتى موافقة الإدارة أو رفضها قبل إرسال طلب جديد.',
     'Deposits are queued for admin approval. Add transaction reference to speed up verification.':
         'تُدرج الإيداعات في قائمة انتظار موافقة الإدارة. أضف مرجع المعاملة لتسريع التحقق.',
+    'Deposits are queued for admin approval. Transaction ID is required for verification.':
+        'تُدرج الإيداعات في قائمة انتظار موافقة الإدارة. رقم المعاملة مطلوب للتحقق.',
     'Submit Deposit Request': 'إرسال طلب الإيداع',
     'Submitting...': 'جارٍ الإرسال...',
     'Please enter a valid deposit amount': 'يرجى إدخال مبلغ إيداع صالح',
@@ -408,6 +416,10 @@ class AppLocalizations {
     'Processing...': 'جارٍ المعالجة...',
     'Loading wallet...': 'جارٍ تحميل المحفظة...',
     'Request Withdrawal': 'طلب سحب',
+    'Pending withdrawal request detected. New withdrawal requests are disabled until the current one is reviewed.':
+        'تم اكتشاف طلب سحب قيد الانتظار. تم تعطيل طلبات السحب الجديدة حتى تتم مراجعة الطلب الحالي.',
+    'You already have a pending withdrawal request. Please wait for admin approval or rejection before submitting a new one.':
+        'لديك بالفعل طلب سحب قيد الانتظار. يرجى الانتظار حتى موافقة الإدارة أو رفضها قبل إرسال طلب جديد.',
     'Please enter a valid withdrawal amount.': 'يرجى إدخال مبلغ سحب صالح.',
     'Withdrawal password is required.': 'كلمة مرور السحب مطلوبة.',
     'Withdrawal request submitted successfully.': 'تم إرسال طلب السحب بنجاح.',

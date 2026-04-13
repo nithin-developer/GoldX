@@ -19,7 +19,8 @@ class DepositPage extends StatefulWidget {
 
 class _DepositPageState extends State<DepositPage> {
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _transactionIdController = TextEditingController();
+  final TextEditingController _transactionIdController =
+      TextEditingController();
 
   final NumberFormat _currencyFormatter = NumberFormat.currency(
     symbol: r'$',
@@ -94,8 +95,24 @@ class _DepositPageState extends State<DepositPage> {
   Future<void> _confirmDeposit() async {
     final l10n = context.l10n;
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    final transactionId = _transactionIdController.text.trim();
+
+    if (_walletSummary.pendingDeposits > 0) {
+      _showMessage(
+        l10n.tr(
+          'You already have a pending deposit request. Please wait for admin approval or rejection before submitting a new one.',
+        ),
+      );
+      return;
+    }
+
     if (amount <= 0) {
       _showMessage(l10n.tr('Please enter a valid deposit amount'));
+      return;
+    }
+
+    if (transactionId.isEmpty) {
+      _showMessage(l10n.tr('Transaction ID is required.'));
       return;
     }
 
@@ -112,17 +129,19 @@ class _DepositPageState extends State<DepositPage> {
       final result = await _walletApi!.createDeposit(
         amount: amount,
         paymentProof: _paymentScreenshot!,
-        transactionRef: _transactionIdController.text,
+        transactionRef: transactionId,
       );
 
       if (!mounted) {
         return;
       }
 
-      _showMessage(l10n.tr(
-        'Deposit request #{id} submitted successfully for review.',
-        params: <String, String>{'id': result.id},
-      ));
+      _showMessage(
+        l10n.tr(
+          'Deposit request #{id} submitted successfully for review.',
+          params: <String, String>{'id': result.id},
+        ),
+      );
 
       setState(() {
         _amountController.clear();
@@ -148,10 +167,7 @@ class _DepositPageState extends State<DepositPage> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
   }
 
@@ -200,6 +216,7 @@ class _DepositPageState extends State<DepositPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final hasPendingDeposit = _walletSummary.pendingDeposits > 0;
     // USDT (TRC20)
     final currency = (_walletDetails?.currency ?? 'USDT').trim();
     final network = (_walletDetails?.network ?? '').trim();
@@ -232,7 +249,10 @@ class _DepositPageState extends State<DepositPage> {
                 const SizedBox(height: 8),
                 Text(
                   _currencyFormatter.format(_walletSummary.balance),
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -240,14 +260,18 @@ class _DepositPageState extends State<DepositPage> {
                     Expanded(
                       child: _StatusPill(
                         title: l10n.tr('Pending Deposits'),
-                        value: _currencyFormatter.format(_walletSummary.pendingDeposits),
+                        value: _currencyFormatter.format(
+                          _walletSummary.pendingDeposits,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _StatusPill(
                         title: l10n.tr('Pending Withdrawals'),
-                        value: _currencyFormatter.format(_walletSummary.pendingWithdrawals),
+                        value: _currencyFormatter.format(
+                          _walletSummary.pendingWithdrawals,
+                        ),
                       ),
                     ),
                   ],
@@ -255,6 +279,33 @@ class _DepositPageState extends State<DepositPage> {
               ],
             ),
           ),
+          if (hasPendingDeposit) ...[
+            const SizedBox(height: 12),
+            GlassCard(
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.pending_actions_rounded,
+                    color: AppColors.primaryBright,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.tr(
+                        'Pending deposit request detected. New deposit requests are disabled until the current one is reviewed.',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Text(
             l10n.tr('Deposit Amount'),
@@ -278,7 +329,10 @@ class _DepositPageState extends State<DepositPage> {
                   ),
                 ),
               ),
-              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 0,
+                minHeight: 0,
+              ),
               hintText: l10n.tr('0.00'),
               hintStyle: const TextStyle(color: AppColors.textMuted),
               border: OutlineInputBorder(
@@ -291,9 +345,15 @@ class _DepositPageState extends State<DepositPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 2,
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 18),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 0,
+                vertical: 18,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -304,11 +364,20 @@ class _DepositPageState extends State<DepositPage> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(child: _AmountChip(value: 100, onTap: () => _selectAmount(100))),
+              Expanded(
+                child: _AmountChip(value: 100, onTap: () => _selectAmount(100)),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _AmountChip(value: 500, onTap: () => _selectAmount(500))),
+              Expanded(
+                child: _AmountChip(value: 500, onTap: () => _selectAmount(500)),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _AmountChip(value: 1000, onTap: () => _selectAmount(1000))),
+              Expanded(
+                child: _AmountChip(
+                  value: 1000,
+                  onTap: () => _selectAmount(1000),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -351,7 +420,7 @@ class _DepositPageState extends State<DepositPage> {
           ),
           const SizedBox(height: 20),
           Text(
-            l10n.tr('Transaction Reference (Optional)'),
+            l10n.tr('Transaction ID'),
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 12),
@@ -360,7 +429,7 @@ class _DepositPageState extends State<DepositPage> {
             decoration: InputDecoration(
               filled: true,
               fillColor: AppColors.background,
-              hintText: l10n.tr('Enter transaction ID if available'),
+              hintText: l10n.tr('Enter transaction ID'),
               hintStyle: const TextStyle(color: AppColors.textMuted),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -372,9 +441,15 @@ class _DepositPageState extends State<DepositPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 2,
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 18,
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -412,10 +487,10 @@ class _DepositPageState extends State<DepositPage> {
                 const SizedBox(height: 14),
                 PrimaryButton(
                   text: _isPickingProof
-                    ? l10n.tr('Selecting...')
+                      ? l10n.tr('Selecting...')
                       : _paymentScreenshot == null
-                    ? l10n.tr('Upload Screenshot')
-                    : l10n.tr('Change Screenshot'),
+                      ? l10n.tr('Upload Screenshot')
+                      : l10n.tr('Change Screenshot'),
                   onPressed: (_isPickingProof || _isSubmitting || _isLoading)
                       ? null
                       : _pickPaymentScreenshot,
@@ -476,7 +551,10 @@ class _DepositPageState extends State<DepositPage> {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.background,
                     borderRadius: BorderRadius.circular(12),
@@ -523,12 +601,16 @@ class _DepositPageState extends State<DepositPage> {
           GlassCard(
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded, color: AppColors.primaryBright, size: 18),
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: AppColors.primaryBright,
+                  size: 18,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     l10n.tr(
-                      'Deposits are queued for admin approval. Add transaction reference to speed up verification.',
+                      'Deposits are queued for admin approval. Transaction ID is required for verification.',
                     ),
                     style: const TextStyle(
                       fontSize: 12,
@@ -545,10 +627,16 @@ class _DepositPageState extends State<DepositPage> {
             text: _isSubmitting
                 ? l10n.tr('Submitting...')
                 : l10n.tr('Submit Deposit Request'),
-            onPressed: _isSubmitting || _isLoading || _isPickingProof
+            onPressed:
+                _isSubmitting ||
+                    _isLoading ||
+                    _isPickingProof ||
+                    hasPendingDeposit
                 ? null
                 : _confirmDeposit,
-            icon: _isSubmitting ? Icons.hourglass_bottom_rounded : Icons.send_rounded,
+            icon: _isSubmitting
+                ? Icons.hourglass_bottom_rounded
+                : Icons.send_rounded,
           ),
         ],
       ),

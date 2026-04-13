@@ -68,6 +68,15 @@ class _WithdrawPageState extends State<WithdrawPage> {
     final address = _addressController.text.trim();
     final password = _passwordController.text.trim();
 
+    if (_walletSummary.pendingWithdrawals > 0) {
+      _showMessage(
+        l10n.tr(
+          'You already have a pending withdrawal request. Please wait for admin approval or rejection before submitting a new one.',
+        ),
+      );
+      return;
+    }
+
     if (amount <= 0) {
       _showMessage(l10n.tr('Please enter a valid withdrawal amount.'));
       return;
@@ -80,9 +89,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
 
     if (amount > _walletSummary.withdrawableBalance) {
       _showMessage(
-        l10n.tr(
-          'Requested amount exceeds your withdrawable balance.',
-        ),
+        l10n.tr('Requested amount exceeds your withdrawable balance.'),
       );
       return;
     }
@@ -133,10 +140,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
   }
 
@@ -151,19 +155,23 @@ class _WithdrawPageState extends State<WithdrawPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final hasPendingWithdrawal = _walletSummary.pendingWithdrawals > 0;
     final lockEndsAt = _walletSummary.capitalLockEndsAt;
     final lockEndsText = lockEndsAt == null
         ? '--'
         : DateFormat('dd MMM yyyy, hh:mm a').format(lockEndsAt.toLocal());
     final requestedAmount = double.tryParse(_amountController.text.trim()) ?? 0;
     final feePercent = _walletSummary.withdrawalFeePercent > 0
-      ? _walletSummary.withdrawalFeePercent
-      : 10;
+        ? _walletSummary.withdrawalFeePercent
+        : 10;
     final estimatedFee = (requestedAmount * feePercent) / 100;
-    final estimatedNet = (requestedAmount - estimatedFee).clamp(0, double.infinity);
+    final estimatedNet = (requestedAmount - estimatedFee).clamp(
+      0,
+      double.infinity,
+    );
     final feeNotice = _walletSummary.withdrawalFeeNotice.trim().isEmpty
-      ? l10n.tr('10% withdrawal fee will be deducted from any withdrawal')
-      : _walletSummary.withdrawalFeeNotice;
+        ? l10n.tr('10% withdrawal fee will be deducted from any withdrawal')
+        : _walletSummary.withdrawalFeeNotice;
 
     return Scaffold(
       appBar: AppBar(
@@ -198,9 +206,14 @@ class _WithdrawPageState extends State<WithdrawPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  l10n.tr('Total Balance: {amount}', params: {
-                    'amount': _currencyFormatter.format(_walletSummary.balance),
-                  }),
+                  l10n.tr(
+                    'Total Balance: {amount}',
+                    params: {
+                      'amount': _currencyFormatter.format(
+                        _walletSummary.balance,
+                      ),
+                    },
+                  ),
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
@@ -213,7 +226,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     Expanded(
                       child: _BalanceCard(
                         title: l10n.tr('Capital'),
-                        value: _currencyFormatter.format(_walletSummary.capitalBalance),
+                        value: _currencyFormatter.format(
+                          _walletSummary.capitalBalance,
+                        ),
                         icon: Icons.account_balance_rounded,
                         color: AppColors.success,
                       ),
@@ -222,7 +237,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     Expanded(
                       child: _BalanceCard(
                         title: l10n.tr('Signal Profits'),
-                        value: _currencyFormatter.format(_walletSummary.signalProfitBalance),
+                        value: _currencyFormatter.format(
+                          _walletSummary.signalProfitBalance,
+                        ),
                         icon: Icons.trending_up_rounded,
                         color: AppColors.primary,
                       ),
@@ -231,7 +248,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     Expanded(
                       child: _BalanceCard(
                         title: l10n.tr('Team Rewards'),
-                        value: _currencyFormatter.format(_walletSummary.rewardBalance),
+                        value: _currencyFormatter.format(
+                          _walletSummary.rewardBalance,
+                        ),
                         icon: Icons.groups_rounded,
                         color: AppColors.highlight,
                       ),
@@ -254,8 +273,11 @@ class _WithdrawPageState extends State<WithdrawPage> {
                       l10n.tr(
                         'First capital deposit lock: {amount} remains locked for {days} day(s), until {date}.',
                         params: {
-                          'amount': _currencyFormatter.format(_walletSummary.lockedCapitalBalance),
-                          'days': _walletSummary.capitalLockDaysRemaining.toString(),
+                          'amount': _currencyFormatter.format(
+                            _walletSummary.lockedCapitalBalance,
+                          ),
+                          'days': _walletSummary.capitalLockDaysRemaining
+                              .toString(),
                           'date': lockEndsText,
                         },
                       ),
@@ -274,7 +296,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     Expanded(
                       child: _BalanceCard(
                         title: l10n.tr('Pending Deposits'),
-                        value: _currencyFormatter.format(_walletSummary.pendingDeposits),
+                        value: _currencyFormatter.format(
+                          _walletSummary.pendingDeposits,
+                        ),
                         icon: Icons.account_balance_wallet_rounded,
                         color: AppColors.success,
                       ),
@@ -283,7 +307,9 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     Expanded(
                       child: _BalanceCard(
                         title: l10n.tr('Pending Withdrawals'),
-                        value: _currencyFormatter.format(_walletSummary.pendingWithdrawals),
+                        value: _currencyFormatter.format(
+                          _walletSummary.pendingWithdrawals,
+                        ),
                         icon: Icons.pending_rounded,
                         color: AppColors.primary,
                       ),
@@ -293,6 +319,33 @@ class _WithdrawPageState extends State<WithdrawPage> {
               ],
             ),
           ),
+          if (hasPendingWithdrawal) ...[
+            const SizedBox(height: 12),
+            GlassCard(
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.pending_actions_rounded,
+                    color: AppColors.primaryBright,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.tr(
+                        'Pending withdrawal request detected. New withdrawal requests are disabled until the current one is reviewed.',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _InputField(
             label: l10n.tr('WITHDRAWAL AMOUNT'),
@@ -415,11 +468,13 @@ class _WithdrawPageState extends State<WithdrawPage> {
           const SizedBox(height: 20),
           PrimaryButton(
             text: _isProcessing
-              ? l10n.tr('Processing...')
+                ? l10n.tr('Processing...')
                 : _isLoading
-              ? l10n.tr('Loading wallet...')
-              : l10n.tr('Request Withdrawal'),
-            onPressed: (_isProcessing || _isLoading) ? null : _requestWithdrawal,
+                ? l10n.tr('Loading wallet...')
+                : l10n.tr('Request Withdrawal'),
+            onPressed: (_isProcessing || _isLoading || hasPendingWithdrawal)
+                ? null
+                : _requestWithdrawal,
             icon: _isProcessing
                 ? Icons.hourglass_bottom_rounded
                 : Icons.arrow_forward_rounded,

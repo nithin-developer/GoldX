@@ -87,7 +87,7 @@ async def get_transactions(
 async def create_deposit(
     request: Request,
     amount: Decimal = Form(...),
-    transaction_ref: str | None = Form(None),
+    transaction_ref: str = Form(...),
     payment_proof: UploadFile = File(...),
     current_user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
@@ -96,7 +96,7 @@ async def create_deposit(
     Submit a deposit request (pending admin approval).
 
     - **amount**: Deposit amount (must be > 0)
-    - **transaction_ref**: Optional payment reference
+    - **transaction_ref**: Required payment reference / transaction ID
     - **payment_proof**: Required screenshot/image proof
     """
     if amount <= 0:
@@ -105,15 +105,27 @@ async def create_deposit(
             detail="amount must be greater than 0",
         )
 
-    payment_proof_filename = await wallet_service.save_payment_proof(payment_proof)
+    normalized_transaction_ref = transaction_ref.strip()
+    if not normalized_transaction_ref:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Transaction ID is required",
+        )
 
-    deposit = await wallet_service.create_deposit(
-        current_user,
-        amount,
-        transaction_ref,
-        payment_proof_filename,
-        db,
-    )
+    await wallet_service.ensure_no_pending_deposit_request(current_user, db)
+
+    payment_proof_filename = await wallet_service.save_payment_proof(payment_proof)
+    try:
+        deposit = await wallet_service.create_deposit(
+            current_user,
+            amount,
+            normalized_transaction_ref,
+            payment_proof_filename,
+            db,
+        )
+    except Exception:
+        wallet_service.delete_payment_proof(payment_proof_filename)
+        raise
 
     base_url = str(request.base_url).rstrip("/")
     return _build_deposit_response(deposit, base_url)
