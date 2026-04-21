@@ -111,9 +111,10 @@ class _WithdrawPageState extends State<WithdrawPage> {
 
       _showMessage(
         l10n.tr(
-          'Withdrawal request submitted. Net payout {amount} after 10% fee.',
+          'Withdrawal request submitted. Net payout {amount} after {fee_percent}% fee.',
           params: <String, String>{
             'amount': _currencyFormatter.format(result.netAmount),
+            'fee_percent': result.feeRatePercent.toStringAsFixed(0),
           },
         ),
       );
@@ -156,21 +157,25 @@ class _WithdrawPageState extends State<WithdrawPage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final hasPendingWithdrawal = _walletSummary.pendingWithdrawals > 0;
-    final lockEndsAt = _walletSummary.capitalLockEndsAt;
-    final lockEndsText = lockEndsAt == null
-        ? '--'
-        : DateFormat('dd MMM yyyy, hh:mm a').format(lockEndsAt.toLocal());
     final requestedAmount = double.tryParse(_amountController.text.trim()) ?? 0;
-    final feePercent = _walletSummary.withdrawalFeePercent > 0
-        ? _walletSummary.withdrawalFeePercent
-        : 10;
+
+    // Determine whether this withdrawal would touch capital balance.
+    final nonCapitalBalance = _walletSummary.signalProfitBalance +
+        _walletSummary.rewardBalance;
+    final touchesCapital = requestedAmount > nonCapitalBalance ||
+        (requestedAmount > 0 &&
+            requestedAmount >= _walletSummary.balance &&
+            _walletSummary.balance > 0);
+    final feePercent = touchesCapital ? 20.0 : 10.0;
     final estimatedFee = (requestedAmount * feePercent) / 100;
     final estimatedNet = (requestedAmount - estimatedFee).clamp(
       0,
       double.infinity,
     );
     final feeNotice = _walletSummary.withdrawalFeeNotice.trim().isEmpty
-        ? l10n.tr('10% withdrawal fee will be deducted from any withdrawal')
+        ? l10n.tr(
+            '20% fee for capital or full balance. 10% for signal profits and team rewards.',
+          )
         : _walletSummary.withdrawalFeeNotice;
 
     return Scaffold(
@@ -257,39 +262,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
                     ),
                   ],
                 ),
-                if (_walletSummary.capitalLockActive) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Text(
-                      l10n.tr(
-                        'First capital deposit lock: {amount} remains locked for {days} day(s), until {date}.',
-                        params: {
-                          'amount': _currencyFormatter.format(
-                            _walletSummary.lockedCapitalBalance,
-                          ),
-                          'days': _walletSummary.capitalLockDaysRemaining
-                              .toString(),
-                          'date': lockEndsText,
-                        },
-                      ),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                ],
+
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -453,7 +426,7 @@ class _WithdrawPageState extends State<WithdrawPage> {
                 Expanded(
                   child: Text(
                     l10n.tr(
-                      'Capital from your first approved deposit is locked for 12 days. Signal profits and team rewards remain withdrawable.',
+                      '20% withdrawal fee applies when withdrawing capital or full balance. 10% fee for signal profit and team reward withdrawals.',
                     ),
                     style: const TextStyle(
                       fontSize: 12,

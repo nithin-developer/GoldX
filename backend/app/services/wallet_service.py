@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from uuid import uuid4
@@ -16,14 +16,18 @@ from app.services.vip_service import recalculate_user_vip_level, sync_referral_s
 
 ALLOWED_QR_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 ALLOWED_PAYMENT_PROOF_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
-INITIAL_CAPITAL_LOCK_DAYS = 12
 _MONEY_QUANTIZER = Decimal("0.01")
 WITHDRAWAL_FEE_RATE = Decimal("0.10")
 WITHDRAWAL_FEE_PERCENT = Decimal("10.00")
-WITHDRAWAL_FEE_NOTICE = "10% withdrawal fee will be deducted from any withdrawal"
+CAPITAL_WITHDRAWAL_FEE_RATE = Decimal("0.20")
+CAPITAL_WITHDRAWAL_FEE_PERCENT = Decimal("20.00")
+WITHDRAWAL_FEE_NOTICE = (
+    "20% fee for withdrawing capital or full balance. "
+    "10% fee for signal profit and team reward withdrawals."
+)
 SELF_DEPOSIT_REWARD_RATE = Decimal("0.06")
-REFERRED_USER_DEPOSIT_REWARD_RATE = Decimal("0.03")
-REFERRER_DEPOSIT_REWARD_RATE = Decimal("0.06")
+REFERRED_USER_DEPOSIT_REWARD_RATE = Decimal("0.04")
+REFERRER_DEPOSIT_REWARD_RATE = Decimal("0.08")
 
 
 def _to_decimal(value: Decimal | int | float | str | None) -> Decimal:
@@ -40,13 +44,22 @@ def _calculate_percentage(amount: Decimal, rate: Decimal) -> Decimal:
     return _quantize_money(_to_decimal(amount) * _to_decimal(rate))
 
 
-def _calculate_withdrawal_fee_breakdown(gross_amount: Decimal) -> dict:
+def _calculate_withdrawal_fee_breakdown(
+    gross_amount: Decimal,
+    touches_capital: bool = False,
+) -> dict:
     gross = _quantize_money(gross_amount)
-    fee_amount = _calculate_percentage(gross, WITHDRAWAL_FEE_RATE)
+    if touches_capital:
+        fee_rate = CAPITAL_WITHDRAWAL_FEE_RATE
+        fee_percent = CAPITAL_WITHDRAWAL_FEE_PERCENT
+    else:
+        fee_rate = WITHDRAWAL_FEE_RATE
+        fee_percent = WITHDRAWAL_FEE_PERCENT
+    fee_amount = _calculate_percentage(gross, fee_rate)
     net_amount = _quantize_money(gross - fee_amount)
     return {
         "gross_amount": gross,
-        "fee_rate_percent": _quantize_money(WITHDRAWAL_FEE_PERCENT),
+        "fee_rate_percent": _quantize_money(fee_percent),
         "fee_amount": fee_amount,
         "net_amount": net_amount,
     }
@@ -64,62 +77,14 @@ def sync_user_total_balance(user: User) -> Decimal:
     return _to_decimal(user.wallet_balance)
 
 
-def get_capital_lock_ends_at(user: User) -> datetime | None:
-    approved_at = user.first_deposit_approved_at
-    if approved_at is None:
-        return None
-
-    if approved_at.tzinfo is None:
-        approved_at = approved_at.replace(tzinfo=timezone.utc)
-
-    return approved_at + timedelta(days=INITIAL_CAPITAL_LOCK_DAYS)
-
-
-def get_locked_capital_balance(user: User, now: datetime | None = None) -> Decimal:
-    lock_ends_at = get_capital_lock_ends_at(user)
-    if lock_ends_at is None:
-        return Decimal("0.00")
-
-    current_time = now or datetime.now(timezone.utc)
-    if current_time >= lock_ends_at:
-        return Decimal("0.00")
-
-    capital_balance = max(_to_decimal(user.capital_balance), Decimal("0"))
-    lock_target = max(_to_decimal(user.initial_capital_locked_amount), Decimal("0"))
-
-    return _quantize_money(min(capital_balance, lock_target))
-
-
 def build_user_balance_breakdown(user: User, now: datetime | None = None) -> dict:
-    current_time = now or datetime.now(timezone.utc)
-
     capital_balance = _quantize_money(user.capital_balance)
     signal_profit_balance = _quantize_money(user.signal_profit_balance)
     reward_balance = _quantize_money(user.reward_balance)
     total_balance = sync_user_total_balance(user)
 
-    lock_ends_at = get_capital_lock_ends_at(user)
-    locked_capital_balance = get_locked_capital_balance(user, current_time)
-    unlocked_capital_balance = _quantize_money(
-        max(capital_balance - locked_capital_balance, Decimal("0"))
-    )
-    withdrawable_balance = _quantize_money(
-        unlocked_capital_balance + signal_profit_balance + reward_balance
-    )
-
-    capital_lock_active = (
-        lock_ends_at is not None
-        and current_time < lock_ends_at
-        and locked_capital_balance > 0
-    )
-
-    capital_lock_days_remaining = 0
-    if capital_lock_active and lock_ends_at is not None:
-        lock_delta = lock_ends_at - current_time
-        capital_lock_days_remaining = max(
-            lock_delta.days + (1 if lock_delta.seconds > 0 else 0),
-            0,
-        )
+    # No hold period — everything is withdrawable.
+    withdrawable_balance = total_balance
 
     return {
         "balance": total_balance,
@@ -127,53 +92,27 @@ def build_user_balance_breakdown(user: User, now: datetime | None = None) -> dic
         "signal_profit_balance": signal_profit_balance,
         "reward_balance": reward_balance,
         "withdrawable_balance": withdrawable_balance,
-        "locked_capital_balance": locked_capital_balance,
-        "unlocked_capital_balance": unlocked_capital_balance,
-        "capital_lock_active": capital_lock_active,
-        "capital_lock_ends_at": lock_ends_at,
-        "capital_lock_days_remaining": capital_lock_days_remaining,
+        "locked_capital_balance": Decimal("0.00"),
+        "unlocked_capital_balance": capital_balance,
+        "capital_lock_active": False,
+        "capital_lock_ends_at": None,
+        "capital_lock_days_remaining": 0,
     }
 
 
 def _allocate_withdrawal_sources(
     user: User,
     amount: Decimal,
-    now: datetime | None = None,
-    enforce_capital_lock: bool = True,
 ) -> dict:
     requested_amount = _quantize_money(amount)
-    current_time = now or datetime.now(timezone.utc)
 
     reward_balance = max(_to_decimal(user.reward_balance), Decimal("0"))
     signal_profit_balance = max(_to_decimal(user.signal_profit_balance), Decimal("0"))
     capital_balance = max(_to_decimal(user.capital_balance), Decimal("0"))
 
-    locked_capital_balance = (
-        get_locked_capital_balance(user, current_time) if enforce_capital_lock else Decimal("0")
-    )
-    unlocked_capital_balance = max(capital_balance - locked_capital_balance, Decimal("0"))
-
-    available_withdrawable = (
-        reward_balance + signal_profit_balance + unlocked_capital_balance
-    )
+    available_withdrawable = reward_balance + signal_profit_balance + capital_balance
 
     if requested_amount > available_withdrawable:
-        if enforce_capital_lock and locked_capital_balance > 0:
-            lock_ends_at = get_capital_lock_ends_at(user)
-            lock_date = (
-                lock_ends_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-                if lock_ends_at is not None
-                else "after lock period"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Insufficient withdrawable balance. "
-                    f"{_quantize_money(locked_capital_balance)} capital is locked "
-                    f"until {lock_date} (first deposit lock)."
-                ),
-            )
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Insufficient withdrawable balance",
@@ -187,7 +126,7 @@ def _allocate_withdrawal_sources(
     signal_profit_amount = min(remaining, signal_profit_balance)
     remaining -= signal_profit_amount
 
-    capital_amount = min(remaining, unlocked_capital_balance)
+    capital_amount = min(remaining, capital_balance)
     remaining -= capital_amount
 
     if remaining > Decimal("0"):
@@ -586,12 +525,17 @@ async def create_withdrawal(
 
     sync_user_total_balance(user)
 
-    allocation = _allocate_withdrawal_sources(
-        user,
-        amount,
-        enforce_capital_lock=True,
+    allocation = _allocate_withdrawal_sources(user, amount)
+
+    # Determine fee tier: 20% if withdrawal touches capital or is the full balance.
+    touches_capital = (
+        _to_decimal(allocation["capital_amount"]) > Decimal("0")
+        or _quantize_money(amount) >= _to_decimal(user.wallet_balance)
     )
-    fee_breakdown = _calculate_withdrawal_fee_breakdown(allocation["amount"])
+    fee_breakdown = _calculate_withdrawal_fee_breakdown(
+        allocation["amount"],
+        touches_capital=touches_capital,
+    )
 
     withdrawal = Withdrawal(
         user_id=user.id,
@@ -813,7 +757,11 @@ async def approve_withdrawal(
         or (fee_amount <= Decimal("0") and _to_decimal(withdrawal.amount) > Decimal("0"))
         or (net_amount <= Decimal("0") and _to_decimal(withdrawal.amount) > Decimal("0"))
     ):
-        fee_breakdown = _calculate_withdrawal_fee_breakdown(_to_decimal(withdrawal.amount))
+        touches_capital = _to_decimal(withdrawal.capital_amount) > Decimal("0")
+        fee_breakdown = _calculate_withdrawal_fee_breakdown(
+            _to_decimal(withdrawal.amount),
+            touches_capital=touches_capital,
+        )
         fee_rate_percent = fee_breakdown["fee_rate_percent"]
         fee_amount = fee_breakdown["fee_amount"]
         net_amount = fee_breakdown["net_amount"]
@@ -846,14 +794,12 @@ async def approve_withdrawal(
             allocation = _allocate_withdrawal_sources(
                 user,
                 _to_decimal(withdrawal.amount),
-                enforce_capital_lock=True,
             )
     else:
         # Legacy rows created before source tracking are reallocated from current balances.
         allocation = _allocate_withdrawal_sources(
             user,
             _to_decimal(withdrawal.amount),
-            enforce_capital_lock=False,
         )
 
     capital_amount = _to_decimal(allocation["capital_amount"])
@@ -880,11 +826,10 @@ async def approve_withdrawal(
     )
     user.capital_balance = _quantize_money(_to_decimal(user.capital_balance) - capital_amount)
 
-    lock_ends_at = get_capital_lock_ends_at(user)
+    # Reduce initial_capital_locked_amount when capital is withdrawn.
     if (
         capital_amount > 0
         and _to_decimal(user.initial_capital_locked_amount) > 0
-        and (lock_ends_at is None or datetime.now(timezone.utc) >= lock_ends_at)
     ):
         user.initial_capital_locked_amount = _quantize_money(
             max(_to_decimal(user.initial_capital_locked_amount) - capital_amount, Decimal("0"))

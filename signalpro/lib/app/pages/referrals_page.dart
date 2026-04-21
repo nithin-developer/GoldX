@@ -27,17 +27,17 @@ const List<_VipLevelSpec> _vipLevelSpecs = <_VipLevelSpec>[
   _VipLevelSpec(
     level: 4,
     minQualifiedReferrals: 30,
-    teamProfitRatePercent: 0.8,
+    teamProfitRatePercent: 2.0,
   ),
   _VipLevelSpec(
     level: 5,
     minQualifiedReferrals: 40,
-    teamProfitRatePercent: 0.9,
+    teamProfitRatePercent: 4.0,
   ),
   _VipLevelSpec(
     level: 6,
     minQualifiedReferrals: 50,
-    teamProfitRatePercent: 1.0,
+    teamProfitRatePercent: 6.0,
   ),
 ];
 

@@ -650,10 +650,6 @@ class _BalanceHeroCard extends StatelessWidget {
     final capital = _MoneyFormatters.currency(data.capitalBalance);
     final signalProfits = _MoneyFormatters.currency(data.signalProfitBalance);
     final teamRewards = _MoneyFormatters.currency(data.rewardBalance);
-    final lockEndsAt = data.capitalLockEndsAt;
-    final lockEndsText = lockEndsAt == null
-        ? '--'
-        : DateFormat('dd MMM yyyy').format(lockEndsAt.toLocal());
 
     return Container(
       decoration: BoxDecoration(
@@ -774,32 +770,37 @@ class _BalanceHeroCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (data.capitalLockActive) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.42),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  l10n.tr(
-                    'Initial capital lock active: {amount} locked for {days} day(s) until {date}.',
-                    params: <String, String>{
-                      'amount': _MoneyFormatters.currency(data.lockedCapitalBalance),
-                      'days': data.capitalLockDaysRemaining.toString(),
-                      'date': lockEndsText,
-                    },
-                  ),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.42),
+                borderRadius: BorderRadius.circular(10),
               ),
-            ],
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 14,
+                    color: AppColors.secondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      l10n.tr(
+                        'Withdrawal Fee: 20% for capital or full balance. 10% for signal profits and team rewards only.',
+                      ),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

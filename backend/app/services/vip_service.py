@@ -23,9 +23,9 @@ TEAM_PROFIT_RATES_PERCENT = {
     1: Decimal("0.5"),
     2: Decimal("0.6"),
     3: Decimal("0.7"),
-    4: Decimal("0.8"),
-    5: Decimal("0.9"),
-    6: Decimal("1.0"),
+    4: Decimal("2.0"),
+    5: Decimal("4.0"),
+    6: Decimal("6.0"),
 }
 
 _MONEY_QUANTIZER = Decimal("0.01")
