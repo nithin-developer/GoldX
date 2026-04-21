@@ -823,16 +823,29 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db():
-    """Create all database tables."""
+    """Create all database tables.
+
+    Uses a PostgreSQL advisory lock so that only one gunicorn worker runs
+    the migration DDL at a time, preventing deadlocks on concurrent
+    CREATE INDEX / ALTER TABLE statements.
+    """
+    _MIGRATION_LOCK_ID = 8675309  # arbitrary, unique for this app
+
     async with engine.begin() as conn:
         from app.models import user, signal, wallet, referral, notification, system_settings  # noqa: F401
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(_ensure_user_ids_and_invite_codes)
-        await conn.run_sync(_ensure_signal_public_ids)
-        await conn.run_sync(_ensure_wallet_public_ids_and_payment_proofs)
-        await conn.run_sync(_ensure_user_balance_breakdown_columns)
-        await conn.run_sync(_ensure_user_verification_rows)
-        await conn.run_sync(_ensure_support_link_and_drop_legacy_support_table)
+
+        # Acquire an advisory lock — other workers block here until released.
+        await conn.execute(text(f"SELECT pg_advisory_lock({_MIGRATION_LOCK_ID})"))
+        try:
+            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(_ensure_user_ids_and_invite_codes)
+            await conn.run_sync(_ensure_signal_public_ids)
+            await conn.run_sync(_ensure_wallet_public_ids_and_payment_proofs)
+            await conn.run_sync(_ensure_user_balance_breakdown_columns)
+            await conn.run_sync(_ensure_user_verification_rows)
+            await conn.run_sync(_ensure_support_link_and_drop_legacy_support_table)
+        finally:
+            await conn.execute(text(f"SELECT pg_advisory_unlock({_MIGRATION_LOCK_ID})"))
 
 
 async def close_db():
